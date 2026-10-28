@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { codexArgv, gatewayOptions, ollamaAnswer, ollamaRequest } from '../src/gateway'
-import { BAND, PANE, START, agentFile, world } from './world'
+import { PANE, START, agentFile, world } from './world'
 
 const STEP = { turnId: 't1', index: 0, model: 'claude-sonnet-5-5', messageCount: 1 } as const
 
@@ -63,7 +63,7 @@ test('the Local chip uses the configured model, and a dead server gets a plain a
   const w = world(on, { '.claude/agents/reviewer.md': agentFile('reviewer') })
   await $.session.start(START)
   await use($, 'reviewer')
-  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const band = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await band.press({ key: 'model-local' })
   expect(await band.find({ type: 'Text', text: /text only/ })).toBeDefined()
 

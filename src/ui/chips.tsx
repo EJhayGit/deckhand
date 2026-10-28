@@ -1,4 +1,4 @@
-// The chip band above the prompt, shown while an agent is active.
+// The active agent's chips, shown at the top of the Deck tab.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderChildren, RenderInput } from 'claude-code'
 
@@ -6,6 +6,7 @@ import type { Chips, Limits, Loop, RepeatMode } from '../../types'
 import { agentText, refreshDeck, saveToLibrary, writeAgent } from '../agents/library'
 import { CODEX_HINT, LOCAL_HINT } from '../gateway'
 import { LIMIT_LABEL } from '../limits'
+import { stopLoop } from '../loop'
 import type { Limit } from '../limits'
 import { routeOf } from '../models'
 import { current, showStatus } from '../session'
@@ -23,7 +24,7 @@ export const REPEAT_CHIPS: readonly { id: RepeatMode; label: string }[] = [
   { id: 'm60', label: '60 min' },
 ]
 
-export async function renderBand($: EngineInterface, e: RenderInput, onStop: () => Promise<void>) {
+export async function renderChips($: EngineInterface, e: RenderInput) {
   const now = await current($)
   if (!now) return undefined
   const { Box, Text, Button } = $.ui.resolve(e)
@@ -48,7 +49,7 @@ export async function renderBand($: EngineInterface, e: RenderInput, onStop: () 
     <Box flexDirection="column" rowGap="xs" paddingX={1}>
       <Box flexDirection="row" columnGap={1}>
         <Text bold>{iconText(agent)} {agent.name}</Text>
-        {running && <Button key="stop" label="Stop" onPress={() => void onStop()} />}
+        {running && <Button key="stop" label="Stop" onPress={() => void stopLoop($)} />}
         {isChanged && <Button key="save-chips" label="Save to agent" onPress={() => saveChips($)} />}
       </Box>
       {row('Model', MODEL_CHIPS.map(m => chip(`model-${m.id ?? 'default'}`, m.label, on.model === m.id || (m.id === 'local' && on.model?.startsWith('local:') === true), () => setChips($, { model: m.id }))))}

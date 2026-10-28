@@ -46,7 +46,7 @@ export async function isHiddenAgent($: EngineInterface, agentType: string): Prom
   return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead' && (await read($, swarmOpen)) === null
 }
 
-// The band already shows the agent, so the status line stays clear.
+// The Deck pane already shows the agent, so the status line stays clear.
 export async function showStatus($: EngineInterface): Promise<void> {
   $.ui.status(undefined)
 }

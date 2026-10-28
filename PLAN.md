@@ -51,7 +51,7 @@ This file is the source of truth when the two differ.
 | Need | Mod API used |
 | --- | --- |
 | Deck panel beside chat | `$.ui.open({ id: 'deck', title: 'Deck' })` and a `ui.render` hook on `{ component: 'Pane', requestId: 'deck' }` |
-| Chip band above prompt | `ui.render` hook on `{ component: 'AbovePrompt' }` |
+| Chips for the active agent | top of the Deck tab in the Pane (moved off the chat 2026-10-29; the chat stays clean) |
 | Status line | `$.ui.status(text)` after each turn and on every change |
 | Blocked notes, loop done | `$.ui.toast(text)` |
 | Agent instructions apply to chat | `prompt.compose` hook adds one section (`scope: 'session'`) with the active agent's instructions |
@@ -131,9 +131,10 @@ The sketch page has the mockups. In words:
 - A dashed "+ New agent" card at the end.
 - A "None" choice to turn the active agent off, so Claude Code goes back to normal.
 
-### Band above the prompt
+### Chips in the Deck
 
-Shown only while an agent is active:
+At the top of the Deck tab, shown only while an agent is active (not above
+the prompt: the owner wants the chat left alone):
 
 - the active agent
 - Model chips: Default, Haiku, Sonnet, Opus, Codex, Local
@@ -219,7 +220,7 @@ deckhand/
     limits.ts            limits -> tools/disallowedTools, and the tool.call decision (pure)
     risk.ts              (Later) warn-only rules ported from AWL
     repeat.ts            loop state machine (pure; the clock is injected)
-    ui/deck.tsx  ui/band.tsx  ui/form.tsx  ui/status.ts
+    ui/deck.tsx  ui/chips.tsx  ui/form.tsx  ui/status.ts
     commands.ts
   types/index.d.ts       PluginState contract for $.state
   tests/*.test.ts(x)

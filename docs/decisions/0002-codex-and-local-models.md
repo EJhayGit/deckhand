@@ -44,7 +44,7 @@ point:
 ## Limits of this approach
 
 - Local answers are text only: the local model can't call Claude Code's
-  tools, so it reads no files and runs nothing. The card and band say so.
+  tools, so it reads no files and runs nothing. The card and chips say so.
 - Codex uses its own tools inside its own sandbox. Deckhand's `tool.call`
   guard doesn't see them. Edit files off maps to Codex's read-only sandbox,
   but Run commands and Internet aren't enforced inside Codex.

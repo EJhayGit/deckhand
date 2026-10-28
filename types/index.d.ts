@@ -57,7 +57,7 @@ export type DeckTab = 'deck' | 'runs' | 'swarm'
 export type SwarmMode = 'parallel' | 'lead'
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 
-// What the chip band applies to this session, over the active agent's file.
+// What the Deck's chips apply to this session, over the active agent's file.
 export type Chips = { model?: string; effort?: Effort; limits: Limits }
 
 export type RepeatMode = 'once' | 'x3' | 'm10' | 'm30' | 'm60'

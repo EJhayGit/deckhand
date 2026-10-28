@@ -11,6 +11,7 @@ import { badges } from '../limits'
 import { routeOf } from '../models'
 import { SETTINGS_PATH, missingPlugins, pluginName, withPlugins } from '../plugins'
 import { useAgent, useNone } from '../session'
+import { renderChips } from './chips'
 import { renderForm } from './form'
 import { mascotSvg } from './mascot'
 import { renderRuns } from './runs'
@@ -69,6 +70,7 @@ async function renderCards($: EngineInterface, e: RenderInput) {
   const shut = await read($, collapsed)
   const settingUp = await read($, setup)
   const enabled = await read($, enabledPlugins)
+  const chips = await renderChips($, e)
   const groups = ['Mine', ...GROUPS].map(g => ({ name: g, cards: cards.filter(c => (c.group ?? 'Mine') === g) })).filter(g => g.cards.length > 0)
 
   return (
@@ -77,6 +79,7 @@ async function renderCards($: EngineInterface, e: RenderInput) {
         <Button key="none" label={inUse === null ? '● None' : 'None'} dimColor={inUse === null} onPress={() => useNone($)} />
         <Text dimColor>{inUse === null ? 'No agent: Claude Code as usual' : `In use: ${inUse}`}</Text>
       </Box>
+      {chips}
       {groups.map(g => {
         const isShut = shut.includes(g.name)
         return (
