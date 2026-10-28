@@ -1,22 +1,20 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { parseAgent } from '../src/agents/format'
-import { spawnArgs } from '../src/swarm'
-import { PANE, START, world } from './world'
+import { parallelPrompt } from '../src/swarm'
+import { PANE, START, turnEnds, world } from './world'
 
-test('pure: a built-in spawns by its registered type, a project agent by its file name', () => {
-  const agent = parseAgent('---\nname: fixer\ndescription: Fixes bugs.\n---\nFix it.\n').agent
-  const builtin = spawnArgs({ agent: { ...agent, name: 'reviewer' }, source: 'builtin', isInLibrary: false, text: '', agentType: 'deckhand:reviewer' }, 'launch-kit', 'Ship it')
-  const project = spawnArgs({ agent, source: 'project', isInLibrary: false, text: '', agentType: 'fixer' }, 'custom', 'Fix login')
+const OFFER = { agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never
 
-  expect(builtin.subagentType).toBe('deckhand:reviewer')
-  expect(builtin.description).toBe('Review the whole kit')
-  expect(builtin.prompt).toContain('Ship it')
-  expect(project.subagentType).toBe('fixer')
-  expect(project.description).toBe('Fixes bugs.')
+test('pure: the parallel prompt names each agent type and its part', () => {
+  const text = parallelPrompt('Ship it', [{ type: 'deckhand:reviewer', part: 'Review the whole kit' }, { type: 'fixer', part: 'Fixes bugs.' }])
+
+  expect(text).toContain('Ship it')
+  expect(text).toContain('1. `deckhand:reviewer`: Review the whole kit')
+  expect(text).toContain('2. `fixer`: Fixes bugs.')
+  expect(text).toContain('Do none of the parts\nyourself.')
 })
 
-test('Parallel starts one agent per pick, each with its own part', async ($, on) => {
+test('Parallel sends one visible prompt asking Claude to start each pick, and offers the built-ins until that turn ends', async ($, on) => {
   const w = world(on)
   mock.clock(on)
   await $.session.start(START)
@@ -25,22 +23,28 @@ test('Parallel starts one agent per pick, each with its own part', async ($, on)
   await ui.press({ key: 'tab-swarm' })
   await ui.press({ key: 'swarm-start' })
   expect(await ui.find({ type: 'Text', text: 'Type the task first.' })).toBeDefined()
-  expect(w.spawned).toEqual([])
+  expect(w.submitted).toEqual([])
 
   await ui.input({ key: 'swarm-task', text: 'Launch the new pricing page' })
   await ui.press({ key: 'swarm-start' })
 
-  expect(w.spawned.map(s => s.description)).toEqual(['Research competitor launches', 'Build the landing page', 'Design the launch graphics', 'Review the whole kit'])
-  expect(w.spawned[1]?.prompt).toContain('Launch the new pricing page')
-  expect(w.spawned[1]?.prompt).toContain('Your part: Build the landing page')
-  // Start switches to Runs. The rows need the agent ids the real engine sets
-  // (the test engine strips them from a spawn the world answered); the runs
-  // tests cover rows.
+  expect(w.submitted).toHaveLength(1)
+  const sent = w.submitted[0]!
+  expect(sent).toContain('Launch the new pricing page')
+  for (const line of ['`deckhand:researcher`: Research competitor launches', '`deckhand:frontend-designer`: Build the landing page', '`deckhand:graphics-designer`: Design the launch graphics', '`deckhand:reviewer`: Review the whole kit']) {
+    expect(sent).toContain(line)
+  }
+  expect(w.spawned).toEqual([])
   expect(await ui.find({ key: 'tile-Cost' })).toBeDefined()
+
+  expect(await $.agent.offer(OFFER)).not.toEqual({ isOffered: false })
+  await $.turn.start({ turnId: 't', text: sent } as never)
+  await $.turn.complete(turnEnds())
+  expect(await $.agent.offer(OFFER)).toEqual({ isOffered: false })
   await ui.unmount()
 })
 
-test('Custom picks start only the picked agents', async ($, on) => {
+test('Custom picks ask only for the picked agents, a project one by its file name', async ($, on) => {
   const w = world(on, { '.claude/agents/fixer.md': '---\nname: fixer\ndescription: Fixes bugs.\n---\nFix it.\n' })
   mock.clock(on)
   await $.session.start(START)
@@ -52,7 +56,8 @@ test('Custom picks start only the picked agents', async ($, on) => {
   await ui.input({ key: 'swarm-task', text: 'Fix the login bug' })
   await ui.press({ key: 'swarm-start' })
 
-  expect(w.spawned.map(s => s.description)).toEqual(['Fixes bugs.'])
+  expect(w.submitted[0]).toContain('1. `fixer`: Fixes bugs.')
+  expect(w.submitted[0]).not.toContain('2. ')
   await ui.unmount()
 })
 
@@ -68,9 +73,8 @@ test('Lead makes swarm-lead active and sends the task to the chat', async ($, on
   await ui.press({ key: 'swarm-start' })
 
   expect(w.submitted).toEqual(['Ship the launch kit'])
-  expect(w.spawned).toEqual([])
   expect(w.status.at(-1)).toContain('swarm-lead')
   // While the lead is in use, the built-ins are offered to the model.
-  expect(await $.agent.offer({ agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never)).not.toEqual({ isOffered: false })
+  expect(await $.agent.offer(OFFER)).not.toEqual({ isOffered: false })
   await ui.unmount()
 })

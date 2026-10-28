@@ -58,8 +58,8 @@ restart it. Nothing global is changed.
 Open the **Swarm** tab to run several agents on one task:
 
 - **Parallel:** pick a preset (Launch kit, Security sweep, Ship check) or tick
-  agents, type the task, click **Start**. Each agent works on its own part in
-  the background.
+  agents, type the task, click **Start**. Deckhand sends a prompt to the chat
+  naming each agent and its part, and Claude starts them in the background.
 - **Lead:** swarm-lead takes the task in the chat, splits it, and hands parts
   to the deck's agents.
 

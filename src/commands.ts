@@ -89,7 +89,7 @@ export async function runDeck($: EngineInterface, args: string): Promise<string>
     const names = preset ? Object.keys(preset.parts) : []
     const notes = await startSwarm($, preset ? 'parallel' : 'lead', command.preset, names, command.task, true)
     await $.ui.open({ ...DECK, focus: true })
-    return notes.length ? notes.join(' ') : preset ? `Started ${preset.label}: ${names.join(', ')}.` : 'swarm-lead has the task.'
+    return notes.length ? notes.join(' ') : preset ? `Asked Claude to start ${preset.label}: ${names.join(', ')}.` : 'swarm-lead has the task.'
   }
 
   return `Usage: /deck ${COMMAND.argumentHint}`

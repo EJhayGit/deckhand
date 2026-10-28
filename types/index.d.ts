@@ -82,6 +82,7 @@ declare module 'claude-code' {
       collapsed: string[]
       runs: Run[]
       swarm: SwarmDraft
+      swarmOpen: string | null
       setup: string | null
       enabledPlugins: string[]
     }

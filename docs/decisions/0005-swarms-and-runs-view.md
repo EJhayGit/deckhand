@@ -11,9 +11,11 @@ colored progress bars, Running and Finished groups, and totals.
 ## What was built
 
 - **Swarm tab**, off unless used. Two modes:
-  - **Parallel:** each picked agent starts at once through `$.agent.spawn`,
-    with the task plus its own part. Presets: Launch kit, Security sweep, Ship
-    check, or a custom pick.
+  - **Parallel:** Deckhand sends one prompt to the chat, as the person's own,
+    naming each picked agent's type and part, and Claude starts them in the
+    background with its Agent tool. Presets: Launch kit, Security sweep, Ship
+    check, or a custom pick. The built-ins are offered to the model until
+    that turn ends.
   - **Lead:** swarm-lead becomes the active agent and the task goes to the
     chat. It splits the work and hands parts to deck agents with the Agent
     tool. While it is in use, the built-ins are offered to the model.
@@ -40,12 +42,14 @@ colored progress bars, Running and Finished groups, and totals.
 - **Tokens and ctx show the latest request**, since each step re-reads the
   conversation; cost adds up over every request.
 
-## Limits of the build
+- **Parallel goes through the chat, not `$.agent.spawn`.** The first live try
+  spawned directly from the Start button, and auto mode's safety check
+  refused every agent: nothing in the conversation asked for them. A visible
+  prompt puts the request in the transcript, and the model's own spawns pass
+  through Deckhand's `agent.spawn`, `turn.step` and `tool.call` hooks, so the
+  Runs view and the limit guard see them.
 
-- A spawn the mod makes itself doesn't pass through its own `agent.spawn`
-  hook, so Parallel adds its rows directly.
-- The test engine strips the agent id from a spawn the test world answers,
-  so the swarm tests check what was spawned, and the runs tests check rows.
+## Limits of the build
 - Local and Codex agents answer only the main chat, so a swarm skips them.
 - Nothing stops two parallel agents from editing the same file. The part
   prompt tells each one to stay in its part.

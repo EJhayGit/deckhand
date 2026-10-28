@@ -9,6 +9,7 @@ const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[
 const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as string | null)
 const chips = atom({ plugin: 'deckhand', key: 'chips' } as const, null as Chips | null)
 const loop = atom({ plugin: 'deckhand', key: 'loop' } as const, null as Loop | null)
+const swarmOpen = atom({ plugin: 'deckhand', key: 'swarmOpen' } as const, null as string | null)
 
 export function chipsOf(agent: Agent): Chips {
   return { model: agent.model, effort: agent.effort, limits: { ...agent.limits } }
@@ -40,11 +41,11 @@ export async function current($: EngineInterface): Promise<{ card: DeckAgent; ch
 }
 
 // Built-in agents stay out of the model's agent list, so they cost no tokens,
-// except while swarm-lead is in use and hands work to them.
+// except while swarm-lead is in use or a swarm prompt is starting them.
 export async function isHiddenAgent($: EngineInterface, agentType: string): Promise<boolean> {
   const card = (await read($, deck)).find(c => c.agentType === agentType)
 
-  return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead'
+  return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead' && (await read($, swarmOpen)) === null
 }
 
 export async function showStatus($: EngineInterface): Promise<void> {

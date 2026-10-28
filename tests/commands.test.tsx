@@ -23,12 +23,14 @@ test('/deck swarm starts a preset, or hands the task to the lead', async ($, on)
   await $.session.start(START)
 
   expect((await $.command.run(deck('swarm nope do it'))).text).toBe('Swarm takes launch-kit, security-sweep, ship-check or lead, then the task.')
-  expect((await $.command.run(deck('swarm security-sweep check auth'))).text).toBe('Started Security sweep: security-auditor, dependency-auditor, change-security-review.')
-  expect(w.spawned.map(s => s.description)).toEqual(['Audit the code for security bugs', 'Audit the dependencies', 'Review this branch for security regressions'])
-  expect((await $.command.run(deck('swarm lead ship the kit'))).text).toBe('swarm-lead has the task.')
+  expect((await $.command.run(deck('swarm security-sweep check auth'))).text).toBe('Asked Claude to start Security sweep: security-auditor, dependency-auditor, change-security-review.')
+  // A command can't submit while it holds the turn: the prompt goes right after.
   expect(w.submitted).toEqual([])
   await clock.advance(1)
-  expect(w.submitted).toEqual(['ship the kit'])
+  expect(w.submitted[0]).toContain('`deckhand:security-auditor`: Audit the code for security bugs')
+  expect((await $.command.run(deck('swarm lead ship the kit'))).text).toBe('swarm-lead has the task.')
+  await clock.advance(1)
+  expect(w.submitted[1]).toBe('ship the kit')
 })
 
 test('/deck is registered, and opens the panel', async ($, on) => {
