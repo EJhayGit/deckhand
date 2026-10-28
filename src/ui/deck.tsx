@@ -93,7 +93,7 @@ function renderIcon($: EngineInterface, e: RenderInput, card: DeckAgent) {
   const color = COLORS[card.agent.color ?? ''] ?? COLORS.gray
   const elements = $.ui.resolve(e)
   // The terminal has no Svg: uploaded icons fall back to the emoji or letter there.
-  if ('Svg' in elements && card.iconSvg) {
+  if (e.surface !== 'terminal' && 'Svg' in elements && card.iconSvg) {
     const { Svg } = elements
     return <Svg source={card.iconSvg} alt={card.agent.name} width={32} height={32} />
   }

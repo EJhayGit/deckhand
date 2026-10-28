@@ -26,6 +26,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     opened: [],
   }
   mock.store(on, store)
+  known = Object.keys(files)
 
   on('fs.list', (_, e) => {
     const dir = `${rel(e.path).replace(/\/$/, '')}/`
@@ -38,7 +39,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   on('fs.read', (_, e) => {
     const text = w.files.get(rel(e.path))
     if (text === undefined) throw new Error(`ENOENT: ${e.path}`)
-    return { value: text }
+    return e.as === 'bytes' ? { value: { base64: btoa(text) } } : { value: text }
   })
   on('fs.write', (_, e) => {
     w.files.set(rel(e.path), e.text)
@@ -84,12 +85,15 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   return w
 }
 
-// The engine hands hooks absolute paths; the world keys files from .claude/.
+// The engine hands hooks absolute paths; the world keys files from .claude/,
+// and other paths by their end (AGENTS.md under the project root).
 function rel(path: string): string {
   const p = path.replaceAll('\\', '/')
   const at = p.indexOf('.claude/')
-  return at >= 0 ? p.slice(at) : p
+  if (at >= 0) return p.slice(at)
+  return known.find(k => p === k || p.endsWith(`/${k}`)) ?? p
 }
+let known: string[] = []
 
 export const PANE = {
   plugin: 'deckhand',
