@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { modelName } from '../src/models'
 import { clockText, costOf, newRun, tokensText, totals } from '../src/runs'
+import { runOf } from '../src/tracker'
 import { PANE, SURFACES, START, turnEnds, world } from './world'
 
 const STEP = { turnId: 't1', index: 0, model: 'claude-sonnet-5-5', effort: 'low', messageCount: 1 } as const
@@ -65,6 +66,33 @@ test('a spawned agent shows in Runs with its usage, steps, time and end', async 
   expect((await ui.find({ key: 'run-a1' }))?.text).toContain('0:17')
   await ui.press({ key: 'clear-runs' })
   expect(await ui.find({ type: 'Text', text: 'Review the whole kit' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('pure: a progress call finds its run by id, then by part, then as the only one running', () => {
+  const a = newRun({ agentId: 'a', title: 'Build the landing page', name: 'x', model: 'm' }, 0)
+  const b = newRun({ agentId: 'b', title: 'Design the launch graphics', name: 'y', model: 'm' }, 0)
+
+  expect(runOf([a, b], 'b', undefined)).toBe('b')
+  expect(runOf([a, b], undefined, ' build the landing page ')).toBe('a')
+  expect(runOf([a, b], undefined, 'Something else')).toBeUndefined()
+  expect(runOf([a, { ...b, status: 'done' }], undefined, undefined)).toBe('a')
+})
+
+test('a progress call with no agent id lands on the run named by its part', async ($, on) => {
+  world(on)
+  mock.clock(on)
+  await $.session.start(START)
+  await $.agent.spawn({ prompt: 'x', subagentType: 'Explore', description: 'Look around' } as never)
+  await $.agent.spawn({ prompt: 'y', subagentType: 'Explore', description: 'Draw it' } as never)
+
+  const result = await $.tool.call({ tool: 'mcp__deckhand__deck_progress', done: 1, total: 4, part: 'Draw it' } as never)
+
+  expect(JSON.stringify(result)).toContain('Recorded.')
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-runs' })
+  expect((await ui.find({ key: 'run-a2' }))?.text).toContain('1/4')
+  expect((await ui.find({ key: 'run-a1' }))?.text).not.toContain('1/4')
   await ui.unmount()
 })
 

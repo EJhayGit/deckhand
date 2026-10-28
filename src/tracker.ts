@@ -12,12 +12,13 @@ const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[
 
 export const PROGRESS_TOOL = {
   name: 'deck_progress',
-  description: 'Report progress on your own task to the Deckhand Runs view. Call it with total (your plan in 3-8 steps) and done: 0 at the start, then again as each step finishes. Cheap and silent.',
+  description: 'Report progress on your own task to the Deckhand Runs view. Call it with total (your plan in 3-8 steps) and done: 0 at the start, then again as each step finishes. Pass part: your task\'s short description, as you were given it. Cheap and silent.',
   inputSchema: {
     type: 'object',
     properties: {
       done: { type: 'integer', minimum: 0, description: 'Steps finished so far.' },
       total: { type: 'integer', minimum: 1, description: 'Steps planned.' },
+      part: { type: 'string', description: 'Your task\'s short description, e.g. "Build the landing page".' },
       note: { type: 'string', description: 'The step in progress, a few words.' },
     },
     required: ['done', 'total'],
@@ -55,10 +56,24 @@ export async function onAgentEnd($: EngineInterface, agentId: string, reason: 'a
 export async function onProgress($: EngineInterface, agentId: string | undefined, input: Record<string, unknown>): Promise<string> {
   const done = Number(input.done)
   const total = Number(input.total)
-  if (agentId === undefined || !Number.isFinite(done) || !Number.isFinite(total)) return 'Progress is for subagents; nothing recorded.'
-  await update($, runs, now => now.map(r => (r.agentId === agentId ? setSteps(r, done, total) : r)))
+  if (!Number.isFinite(done) || !Number.isFinite(total)) return 'done and total must be numbers; nothing recorded.'
+  const id = runOf(await read($, runs), agentId, typeof input.part === 'string' ? input.part : undefined)
+  if (id === undefined) return 'No running agent matches; pass part as your task\'s short description.'
+  await update($, runs, now => now.map(r => (r.agentId === id ? setSteps(r, done, total) : r)))
 
   return 'Recorded.'
+}
+
+// The run a progress call is about. A live session showed the call can
+// arrive without the caller's agent id, so it falls back to the part's title,
+// then to the only running agent.
+export function runOf(all: readonly Run[], agentId: string | undefined, part: string | undefined): string | undefined {
+  const running = all.filter(r => r.status === 'running')
+  if (agentId !== undefined && all.some(r => r.agentId === agentId)) return agentId
+  const named = part === undefined ? [] : running.filter(r => r.title.trim().toLowerCase() === part.trim().toLowerCase())
+  if (named.length === 1) return named[0]!.agentId
+
+  return running.length === 1 ? running[0]!.agentId : undefined
 }
 
 export async function clearFinished($: EngineInterface): Promise<void> {

@@ -62,7 +62,8 @@ Start every agent below now, in one message: one Agent call each, in the
 background, with that subagent_type and the part as its description. Give each
 the task above and its part, tell it to stay inside its part and not to edit
 files another part owns, and to report its steps with
-mcp__deckhand__deck_progress if that tool is available. Do none of the parts
+mcp__deckhand__deck_progress (passing its part as \`part\`) if that tool is
+available. Do none of the parts
 yourself. When they finish, give me a short combined report.
 
 ${list}
