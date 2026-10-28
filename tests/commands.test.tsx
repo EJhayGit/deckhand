@@ -74,3 +74,15 @@ test('/deck with unknown words shows usage', async ($, on) => {
 
   expect((await $.command.run(deck('dance'))).text).toContain('Usage: /deck')
 })
+
+test('/deck shows agent files added after the session started', async ($, on) => {
+  const w = world(on)
+  await $.session.start(START)
+  w.files.set('.claude/agents/late.md', agentFile('late'))
+
+  await $.command.run(deck(''))
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+
+  expect(await pane.find({ type: 'Text', text: 'late' })).toBeDefined()
+  await pane.unmount()
+})

@@ -3,6 +3,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { DeckAgent, RepeatMode } from '../types'
+import { refreshDeck } from './agents/library'
 import { LIMIT_LABEL } from './limits'
 import type { Limit } from './limits'
 import { stopLoop } from './loop'
@@ -49,6 +50,8 @@ export function parseDeck(args: string): DeckCommand {
 export async function runDeck($: EngineInterface, args: string): Promise<string> {
   const command = parseDeck(args)
   if (command.kind === 'open') {
+    // Re-read the folder: agent files added after the session started show now.
+    await refreshDeck($)
     await $.ui.open({ ...DECK, focus: true })
     return 'Deck opened.'
   }
