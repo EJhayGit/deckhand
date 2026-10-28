@@ -3,7 +3,7 @@
 ## State
 
 - All of PLAN.md M0 to M8 is built on branch `build-v1`, one commit per
-  milestone, in one PR. The earlier `m0-skeleton` PR (#1) is folded in.
+  milestone, in one PR (#2). M0 (#1) is already merged.
 - Decisions: `docs/decisions/0001-hooks-import-and-turn-cancel.md` and
   `0002-codex-and-local-models.md`.
 
