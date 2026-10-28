@@ -1,6 +1,7 @@
 // Labels for chips and the status line. Pure: no `$`.
 import type { Agent, Chips, Effort, Loop } from '../../types'
 import { badges } from '../limits'
+import { CLAUDE_IDS, modelName } from '../models'
 
 export const MODEL_CHIPS = [
   { id: undefined, label: 'Default' },
@@ -50,6 +51,11 @@ export function modelLabel(model: string | undefined): string {
   if (model.startsWith('local:')) return `Local ${model.slice(6)}`
 
   return model
+}
+
+// Cards name Claude models with their version ("Opus 5.5"); others as chips do.
+export function modelText(model: string | undefined): string {
+  return model !== undefined && CLAUDE_IDS[model] ? modelName(model) : modelLabel(model)
 }
 
 export function iconText(agent: Agent): string {

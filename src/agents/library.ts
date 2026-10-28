@@ -11,6 +11,7 @@ export const AGENTS_DIR = '.claude/agents'
 export const ICONS_DIR = '.claude/deckhand/icons'
 const LIBRARY = 'library'
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
+const enabledPlugins = atom({ plugin: 'deckhand', key: 'enabledPlugins' } as const, [] as string[])
 
 export function agentPath(name: string): string {
   return `${AGENTS_DIR}/${name}.md`
@@ -118,6 +119,9 @@ export async function registerAgent($: EngineInterface, agent: Agent): Promise<v
 export async function refreshDeck($: EngineInterface): Promise<DeckAgent[]> {
   const cards = await loadDeck($)
   await update($, deck, () => cards)
+  const plugins = await $.settings.read({ key: 'enabledPlugins' }).catch(() => undefined)
+  const on = typeof plugins === 'object' && plugins !== null ? Object.entries(plugins).filter(([, v]) => v === true).map(([k]) => k) : []
+  await update($, enabledPlugins, () => on)
   for (const card of cards.filter(c => c.source !== 'project')) {
     await registerAgent($, card.agent).catch(() => undefined)
   }

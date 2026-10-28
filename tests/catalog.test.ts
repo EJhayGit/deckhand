@@ -4,6 +4,7 @@ import { parseAgent } from '../src/agents/format'
 import { agentText } from '../src/agents/library'
 import { BUILTINS, GROUPS, STARTERS } from '../src/agents/starters'
 import { LIMIT_TOOLS } from '../src/limits'
+import { mascotSvg } from '../src/ui/mascot'
 
 test('built-in names are unique, valid, and in a known group', () => {
   const ids = STARTERS.map(s => s.id)
@@ -31,6 +32,15 @@ test('each built-in file parses back to itself, with its limits applied to its t
         expect(back.disallowedTools?.includes(tool)).toBe(!agent.limits[limit])
       }
     }
+  }
+})
+
+test('every mascot draws on its 14 x 12 grid', () => {
+  for (const hat of ['cap', 'hardhat', 'headphones', 'beret', 'antenna', 'crown', 'none'] as const) {
+    const svg = mascotSvg('#f76b15', hat)
+    const xs = [...svg.matchAll(/x="(\d+)" y="(\d+)"/g)].map(m => [Number(m[1]), Number(m[2])])
+    expect(xs.every(([x, y]) => x! < 14 && y! < 12)).toBe(true)
+    expect(svg).toContain('fill="#f76b15"')
   }
 })
 

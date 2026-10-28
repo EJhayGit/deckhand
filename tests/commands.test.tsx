@@ -13,6 +13,22 @@ test('pure: /deck arguments parse', () => {
   expect(parseDeck('limits')).toEqual({ kind: 'limits' })
   expect(parseDeck('use')).toEqual({ kind: 'help' })
   expect(parseDeck('dance')).toEqual({ kind: 'help' })
+  expect(parseDeck('swarm ship-check before the release')).toEqual({ kind: 'swarm', preset: 'ship-check', task: 'before the release' })
+  expect(parseDeck('swarm lead')).toEqual({ kind: 'help' })
+})
+
+test('/deck swarm starts a preset, or hands the task to the lead', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+
+  expect((await $.command.run(deck('swarm nope do it'))).text).toBe('Swarm takes launch-kit, security-sweep, ship-check or lead, then the task.')
+  expect((await $.command.run(deck('swarm security-sweep check auth'))).text).toBe('Started Security sweep: security-auditor, dependency-auditor, change-security-review.')
+  expect(w.spawned.map(s => s.description)).toEqual(['Audit the code for security bugs', 'Audit the dependencies', 'Review this branch for security regressions'])
+  expect((await $.command.run(deck('swarm lead ship the kit'))).text).toBe('swarm-lead has the task.')
+  expect(w.submitted).toEqual([])
+  await clock.advance(1)
+  expect(w.submitted).toEqual(['ship the kit'])
 })
 
 test('/deck is registered, and opens the panel', async ($, on) => {

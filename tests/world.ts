@@ -16,6 +16,8 @@ export type World = {
   fetches: { url: string; body?: string }[]
   stdout: string
   reply: { ok: boolean; status: number; text: string } | 'refused'
+  enabledPlugins: Record<string, boolean>
+  spawned: { subagentType: string; description: string; prompt: string }[]
 }
 
 export function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}): World {
@@ -32,6 +34,8 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     fetches: [],
     stdout: '',
     reply: { ok: true, status: 200, text: '{}' },
+    enabledPlugins: {},
+    spawned: [],
   }
   mock.store(on, store)
   known = Object.keys(files)
@@ -80,11 +84,17 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     w.opened.push(e.id)
     return { value: { isPlaced: true } }
   })
+  on('settings.read', () => ({ value: { enabledPlugins: w.enabledPlugins } }))
+  on('agent.spawn', (_, e) => {
+    w.spawned.push({ subagentType: e.subagentType, description: e.description, prompt: e.prompt })
+    return { model: 'claude-sonnet-5-5', agentId: `a${w.spawned.length}` }
+  })
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('agent.register', (_, e) => {
     w.agents.push({ name: e.name, disallowedTools: e.disallowedTools, model: e.model })
     return { value: { agent: `deckhand:${e.name}` } }
   })
+  on('agent.offer', () => ({ isOffered: true }))
   on('prompt.submit', (_, e) => {
     w.submitted.push(e.text)
     return { text: e.text }

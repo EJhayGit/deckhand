@@ -8,6 +8,7 @@ import { LIMIT_LABEL } from './limits'
 import type { Limit } from './limits'
 import { stopLoop } from './loop'
 import { current, useAgent, useNone } from './session'
+import { PRESETS, startSwarm } from './swarm'
 import { DECK } from './ui/deck'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
@@ -15,8 +16,8 @@ const repeat = atom({ plugin: 'deckhand', key: 'repeat' } as const, 'once' as Re
 
 export const COMMAND = {
   name: 'deck',
-  description: 'Open the Deck, or: use <name>, none, repeat <3|10m|30m|60m|stop>, limits',
-  argumentHint: '[use <name> | none | repeat <3|10m|30m|60m|stop> | limits]',
+  description: 'Open the Deck, or: use <name>, none, repeat <3|10m|30m|60m|stop>, limits, swarm <preset|lead> <task>',
+  argumentHint: '[use <name> | none | repeat <3|10m|30m|60m|stop> | limits | swarm <launch-kit|security-sweep|ship-check|lead> <task>]',
 }
 
 const REPEATS: Record<string, { mode: RepeatMode; text: string }> = {
@@ -32,6 +33,7 @@ export type DeckCommand =
   | { kind: 'none' }
   | { kind: 'repeat'; value: string }
   | { kind: 'limits' }
+  | { kind: 'swarm'; preset: string; task: string }
   | { kind: 'help' }
 
 // Pure: the words after /deck.
@@ -43,6 +45,7 @@ export function parseDeck(args: string): DeckCommand {
   if (word === 'none') return { kind: 'none' }
   if (word === 'repeat' && tail !== '') return { kind: 'repeat', value: tail }
   if (word === 'limits') return { kind: 'limits' }
+  if (word === 'swarm' && rest.length >= 2) return { kind: 'swarm', preset: rest[0]!, task: rest.slice(1).join(' ') }
 
   return { kind: 'help' }
 }
@@ -79,6 +82,14 @@ export async function runDeck($: EngineInterface, args: string): Promise<string>
     if (!now) return 'No agent is in use, so nothing is limited.'
     const lines = (Object.keys(LIMIT_LABEL) as Limit[]).map(l => `${LIMIT_LABEL[l]}: ${now.chips.limits[l] ? 'on' : 'off'}`)
     return `${now.card.agent.name} can:\n${lines.join('\n')}`
+  }
+  if (command.kind === 'swarm') {
+    const preset = PRESETS.find(p => p.id === command.preset)
+    if (command.preset !== 'lead' && !preset) return `Swarm takes ${PRESETS.map(p => p.id).join(', ')} or lead, then the task.`
+    const names = preset ? Object.keys(preset.parts) : []
+    const notes = await startSwarm($, preset ? 'parallel' : 'lead', command.preset, names, command.task, true)
+    await $.ui.open({ ...DECK, focus: true })
+    return notes.length ? notes.join(' ') : preset ? `Started ${preset.label}: ${names.join(', ')}.` : 'swarm-lead has the task.'
   }
 
   return `Usage: /deck ${COMMAND.argumentHint}`
