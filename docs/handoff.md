@@ -25,12 +25,12 @@
 ## Open items
 
 - First live swarm (Launch kit, 2026-10-28): the four agents started from the
-  chat prompt and their rows showed in the Runs tab. Fixed after it: Parallel
+  chat prompt and their rows showed in the Runs tab, with tokens, cost and
+  the timer moving. Fixed after it: Parallel
   now goes through the chat (auto mode refused direct spawns), and progress
   calls match their run by part (they arrived without an agent id).
-- Still to confirm live:
-  - Tokens, cost and the timer move on each row (usage from `turn.step`).
-  - Steps like `2/4` show, now that progress calls match by part.
+- Still to confirm live: steps like `2/4` show, now that progress calls match
+  by part.
   - The `skills` names `<plugin>:<skill>` resolve once the plugins install.
   - The progress bar Box (`width="NN%"`, `height={1}`) draws on desktop.
 - Model prices in `src/models.ts` (`PRICES`) are list prices from 2026-10;
