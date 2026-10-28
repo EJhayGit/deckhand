@@ -4,8 +4,10 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Chips, Limits, Loop, RepeatMode } from '../../types'
 import { agentText, refreshDeck, saveToLibrary, writeAgent } from '../agents/library'
+import { CODEX_HINT, LOCAL_HINT } from '../gateway'
 import { LIMIT_LABEL } from '../limits'
 import type { Limit } from '../limits'
+import { routeOf } from '../models'
 import { current, showStatus } from '../session'
 import { EFFORT_CHIPS, MODEL_CHIPS, iconText } from './status'
 
@@ -52,6 +54,8 @@ export async function renderBand($: EngineInterface, e: RenderInput, onStop: () 
         {running && <Button key="stop" label="Stop" onPress={() => void onStop()} />}
         {isChanged && <Button key="save-chips" label="Save to agent" onPress={() => saveChips($)} />}
       </Box>
+      {routeOf(on.model).kind === 'local' && <Text dimColor>{LOCAL_HINT}</Text>}
+      {routeOf(on.model).kind === 'codex' && <Text dimColor>{CODEX_HINT}</Text>}
     </Box>
   )
 }

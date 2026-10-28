@@ -5,7 +5,9 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 import type { DeckAgent, View } from '../../types'
 import { refreshDeck, removeAgent, saveToLibrary, writeAgent } from '../agents/library'
 import { STARTERS } from '../agents/starters'
+import { LOCAL_HINT } from '../gateway'
 import { badges } from '../limits'
+import { routeOf } from '../models'
 import { useAgent, useNone } from '../session'
 import { renderForm } from './form'
 import { COLORS, iconText, modelLabel } from './status'
@@ -63,6 +65,7 @@ function renderCard($: EngineInterface, e: RenderInput, card: DeckAgent, isActiv
           <Text bold>{name}</Text>
           <Text dimColor wrap="truncate-end">{summary}</Text>
           <Text dimColor>{tags.map(t => `[${t}]`).join(' ')}</Text>
+          {routeOf(agent.model).kind === 'local' && <Text dimColor>{LOCAL_HINT}</Text>}
         </Box>
       </Box>
       <Box flexDirection="row" gap={1}>

@@ -2,6 +2,8 @@ import { atom, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import { refreshDeck } from '../src/agents/library'
+import { gatewayOptions } from '../src/gateway'
+import { codexAnswer, localAnswer } from '../src/gatewayTurn'
 import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
@@ -12,7 +14,11 @@ import { DECK, renderDeck } from '../src/ui/deck'
 
 const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as string | null)
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const gateway = gatewayOptions(options)
+  // The person's text for this turn: turn.step does not carry it.
+  let prompt = ''
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register(COMMAND)
@@ -59,7 +65,10 @@ export const register: Register = on => {
   })
 
   on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) await update($, turnId, () => e.turnId)
+    if (e.agentId === undefined) {
+      prompt = e.text
+      await update($, turnId, () => e.turnId)
+    }
     return next(e)
   })
 
@@ -68,6 +77,15 @@ export const register: Register = on => {
     const now = e.agentId === undefined ? await current($) : undefined
     if (!now) return yield* next(e)
     const route = routeOf(now.chips.model)
+    // Local and Codex: Deckhand answers the turn itself, in text, with no tool calls.
+    if (route.kind === 'local' || route.kind === 'codex') {
+      const answer = route.kind === 'local'
+        ? await localAnswer($, gateway, now.card.agent, route.model, prompt)
+        : await codexAnswer($, gateway, now.card.agent, now.chips.limits, prompt)
+      yield { kind: 'text' as const, index: 0, text: answer }
+      yield { kind: 'stop' as const, stopReason: 'end_turn' as const, usage: null }
+      return { turnId: e.turnId, index: e.index, answer, toolUses: [], stopReason: 'end_turn' as const, usage: null }
+    }
     const model = route.kind === 'claude' ? route.id : e.model
     const effort = now.chips.effort ?? e.effort
 

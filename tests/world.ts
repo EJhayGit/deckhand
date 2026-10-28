@@ -12,6 +12,10 @@ export type World = {
   submitted: string[]
   aborted: string[]
   opened: string[]
+  runs: string[][]
+  fetches: { url: string; body?: string }[]
+  stdout: string
+  reply: { ok: boolean; status: number; text: string } | 'refused'
 }
 
 export function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}): World {
@@ -24,6 +28,10 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     submitted: [],
     aborted: [],
     opened: [],
+    runs: [],
+    fetches: [],
+    stdout: '',
+    reply: { ok: true, status: 200, text: '{}' },
   }
   mock.store(on, store)
   known = Object.keys(files)
@@ -47,9 +55,14 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   })
   on('fs.exists', (_, e) => ({ value: w.files.has(rel(e.path)) }))
   on('process.run', (_, e) => {
-    const path = rel(e.argv[e.argv.length - 1] ?? '')
-    w.files.delete(path)
-    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    w.runs.push([...e.argv])
+    if (e.argv[0] === 'rm') w.files.delete(rel(e.argv[e.argv.length - 1] ?? ''))
+    return { value: { exitCode: 0, stdout: w.stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('http.fetch', (_, e) => {
+    w.fetches.push({ url: e.url, body: e.init?.body })
+    if (w.reply === 'refused') throw new Error('ECONNREFUSED')
+    return { value: { ...w.reply, headers: {} } }
   })
   on('ui.toast', (_, e) => {
     w.toasts.push(e.text)

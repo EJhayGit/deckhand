@@ -3,5 +3,25 @@
   "version": "0.1.0",
   "types": "./types/index.d.ts",
   "author": { "name": "EJhayGit" },
-  "description": "A deck of reusable agents beside the chat, with chips for model, effort, limits and repeat."
+  "description": "A deck of reusable agents beside the chat, with chips for model, effort, limits and repeat.",
+  "userConfig": {
+    "localUrl": {
+      "type": "string",
+      "title": "Local model server",
+      "description": "Where Ollama listens, for agents on the Local model.",
+      "default": "http://localhost:11434"
+    },
+    "localModel": {
+      "type": "string",
+      "title": "Local model",
+      "description": "The Ollama model a Local agent uses unless it names one (local:<name>).",
+      "default": "llama3.2"
+    },
+    "codexCommand": {
+      "type": "string",
+      "title": "Codex command",
+      "description": "The Codex CLI that Codex agents run (codex exec).",
+      "default": "codex"
+    }
+  }
 }
