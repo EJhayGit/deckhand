@@ -2,15 +2,14 @@
 
 ## State
 
-- All of PLAN.md M0 to M8 is built on branch `build-v1`, one commit per
-  milestone, in one PR (#2). M0 (#1) is already merged.
+- Deckhand 0.1.0 is released: PR #2 merged into `main` and tagged `v0.1.0`.
+  Install with `/plugin install deckhand --marketplace EJhayGit/deckhand`.
 - Decisions: `docs/decisions/0001-hooks-import-and-turn-cancel.md` and
   `0002-codex-and-local-models.md`.
 
 ## Next step
 
-- Owner: try it (`claude --plugin-dir .` from a checkout of `build-v1`), then
-  merge. After merge, tag `v0.1.0` and push the tag.
+- Owner: install it and try it in a live session, then report what breaks.
 
 ## Open items
 
