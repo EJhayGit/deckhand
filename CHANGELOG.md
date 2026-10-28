@@ -9,8 +9,10 @@
 - New card look: pixel mascots, a colored weight word, model and effort.
 - Runs tab: every agent the session started, with steps, context, tokens,
   estimated cost, time, a progress bar and totals.
-- Optional swarms: Parallel (presets or a custom pick) and Lead (swarm-lead
+- Optional swarms: Parallel (presets or a custom pick; Deckhand sends the
+  request to the chat and Claude starts the agents) and Lead (swarm-lead
   delegates). `/deck swarm`.
+- Agents report steps to the Runs tab with the `deck_progress` tool.
 - XHigh effort chip.
 
 ## 0.1.0 (2026-10-28)

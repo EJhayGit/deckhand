@@ -24,7 +24,13 @@ colored progress bars, Running and Finished groups, and totals.
   swarm. `agent.spawn` adds the row, each `turn.step` of that agent updates
   tokens, ctx and cost, `turn.complete` ends it, and a `deck_progress` tool
   lets an agent report `done/total` steps. A one-second clock redraws only
-  while something runs.
+  while something runs. Confirmed in the first live swarm: rows, tokens, cost
+  and timers move.
+- **Progress matches by part.** Live, `deck_progress` calls arrived without
+  the caller's agent id, so a call finds its run by id, then by the `part` it
+  passes (its task's short description), then as the only running agent. The
+  tool sits behind tool search, and an agent whose `tools` list names only
+  built-in tools (like this repo's own reviewer) can't call it.
 - The weight word comes from effort: low light, medium medium, high careful,
   xhigh and max heavy. The XHigh effort chip was added for it.
 
@@ -34,14 +40,15 @@ colored progress bars, Running and Finished groups, and totals.
   agent's limits to every loop, subagents included, so a read-only lead would
   stop its workers from editing. Its instructions forbid doing the work
   itself, and each worker keeps its own `tools` and `disallowedTools`.
-- **Parallel agents hold their own limits.** No agent is active during a
-  parallel swarm, so the guard has nothing to apply; each agent's registered
-  tool lists hold it, as for any subagent.
+- **Swarm agents hold their own limits through Claude Code.** No agent is
+  active during a Parallel swarm, so Deckhand's guard has nothing to add;
+  Claude Code holds each agent to its own `tools` and `disallowedTools`, which
+  Deckhand writes from the agent's limits. Deckhand's guard covers the agent
+  in Use (and, in Lead mode, swarm-lead, which allows everything).
 - **Cost is an estimate**, from list prices in `src/models.ts`. There is no
   cap, as `PLAN.md` decided.
 - **Tokens and ctx show the latest request**, since each step re-reads the
   conversation; cost adds up over every request.
-
 - **Parallel goes through the chat, not `$.agent.spawn`.** The first live try
   spawned directly from the Start button, and auto mode's safety check
   refused every agent: nothing in the conversation asked for them. A visible
@@ -50,6 +57,7 @@ colored progress bars, Running and Finished groups, and totals.
   Runs view and the limit guard see them.
 
 ## Limits of the build
+
 - Local and Codex agents answer only the main chat, so a swarm skips them.
 - Nothing stops two parallel agents from editing the same file. The part
   prompt tells each one to stay in its part.
