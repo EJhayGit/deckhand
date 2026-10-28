@@ -1,5 +1,13 @@
 {
   "name": "deckhand",
-  "owner": { "name": "EJhayGit" },
-  "plugins": [{ "name": "deckhand", "source": "./" }]
+  "description": "Deckhand: a deck of reusable agents beside the Claude Code chat.",
+  "owner": {
+    "name": "EJhayGit"
+  },
+  "plugins": [
+    {
+      "name": "deckhand",
+      "source": "./"
+    }
+  ]
 }

@@ -19,7 +19,9 @@ starter templates; `PLAN.md` wins over them. Design choices go in
 - Load the `plugin-authoring` skill before writing or changing mod code.
 - Work inline in the session. Don't use subagents or per-task implementer or
   reviewer agents; the owner considers them a waste of tokens.
-- Build one milestone per branch and per PR, in the order `PLAN.md` gives.
+- Build all milestones on one branch (`build-v1`) with one PR, in the order
+  `PLAN.md` gives. Commit after each milestone, running the checks below each
+  time. Don't stop to ask between milestones.
 - Automated tests never make paid model calls. Use the mocked clock for timers.
 - Limits are enforced in the `tool.call` guard, which fails closed. Never
   weaken a limit test to make it pass.
@@ -30,22 +32,31 @@ starter templates; `PLAN.md` wins over them. Design choices go in
 - Keep pure logic (agent format, limits, repeat) free of `$` so it tests
   without the engine.
 - Add no runtime dependency without a clear need and a `docs/decisions/` note.
-- When the mod API can't do what the plan assumes, stop and tell the owner in
-  plain words with the closest option.
+- When the mod API can't do what the plan assumes, build the closest option,
+  note it in the PR in plain words, and keep going.
 
-## Architecture (planned, see PLAN.md sections 4 and 8)
+## Architecture
 
 - The repo root is both the plugin and its marketplace
   (`.claude-plugin/plugin.json` and `marketplace.json`).
-- `hooks/register.tsx` only wires events to modules in `src/`. Whether the hooks
-  module can import from `src/` is an M0 unknown; if it can't, pure logic lives
-  in `hooks/` next to it.
-- Pure modules: `src/agents/format.ts` (agent Markdown round trip, keeps unknown
-  keys and body), `src/limits.ts`, `src/repeat.ts` (clock injected). The
-  `$.state` contract is in `types/index.d.ts`.
-- An active agent applies through three hooks: `prompt.compose` adds its
+- `hooks/register.tsx` only wires events to modules in `src/`. A `src/` helper
+  that takes `$` must be a `function` declaration, or validate refuses it
+  (`docs/decisions/0001-hooks-import-and-turn-cancel.md`).
+- State atoms must be declared (`atom({ plugin: 'deckhand', key })`) in each
+  file that reads or writes them; validate refuses one imported from another
+  file. The contract for every key is `types/index.d.ts`.
+- Pure modules (tested without the engine): `src/agents/format.ts`,
+  `src/limits.ts`, `src/repeat.ts`, `src/models.ts`, `src/gateway.ts`,
+  `src/ui/status.ts`.
+- An active agent applies through hooks: `prompt.compose` adds its
   instructions, `turn.step` rewrites model and effort for the main loop only
-  (`e.agentId === undefined`), and `tool.call` denies blocked tools.
+  (`e.agentId === undefined`) or answers Local/Codex turns itself, and
+  `tool.call` denies blocked tools for every loop.
+- Tests use the memory world in `tests/world.ts` (files, store, toasts, runs,
+  fetches). The engine hands hooks absolute paths; the world maps them back.
+- Until the mod has loaded once, the API types aren't in `.claude-plugin/types/`:
+  type-check with a temporary tsconfig that extends this one and includes the
+  bundled `claude-code.d.ts` named by the plugin-authoring skill.
 - Check mod API calls by grepping `.claude-plugin/types/claude-code/index.d.ts`
   rather than reading the whole file.
 
