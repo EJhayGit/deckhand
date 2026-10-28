@@ -28,7 +28,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   mock.store(on, store)
 
   on('fs.list', (_, e) => {
-    const dir = `${e.path.replace(/\/$/, '')}/`
+    const dir = `${rel(e.path).replace(/\/$/, '')}/`
     const names = [...w.files.keys()].filter(p => p.startsWith(dir) && !p.slice(dir.length).includes('/'))
     if (names.length === 0) throw new Error(`ENOENT: ${e.path}`)
     return {
@@ -36,17 +36,17 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     }
   })
   on('fs.read', (_, e) => {
-    const text = w.files.get(e.path)
+    const text = w.files.get(rel(e.path))
     if (text === undefined) throw new Error(`ENOENT: ${e.path}`)
     return { value: text }
   })
   on('fs.write', (_, e) => {
-    w.files.set(e.path, e.text)
+    w.files.set(rel(e.path), e.text)
     return { value: undefined }
   })
-  on('fs.exists', (_, e) => ({ value: w.files.has(e.path) }))
+  on('fs.exists', (_, e) => ({ value: w.files.has(rel(e.path)) }))
   on('process.run', (_, e) => {
-    const path = e.argv[e.argv.length - 1] ?? ''
+    const path = rel(e.argv[e.argv.length - 1] ?? '')
     w.files.delete(path)
     return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
@@ -82,6 +82,13 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   on('session.start', (_, e) => ({ cwd: e.cwd }))
 
   return w
+}
+
+// The engine hands hooks absolute paths; the world keys files from .claude/.
+function rel(path: string): string {
+  const p = path.replaceAll('\\', '/')
+  const at = p.indexOf('.claude/')
+  return at >= 0 ? p.slice(at) : p
 }
 
 export const PANE = {
