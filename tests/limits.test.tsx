@@ -106,7 +106,7 @@ test('a chip change applies at once: turning Run commands on lets Bash through',
   })
   await $.session.start(START)
   await useAgent($, 'reviewer')
-  const band = await $.ui.mount({ plugin: 'deckhand', component: 'AbovePrompt', surface: 'terminal', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 100, scroll: { offset: 0, bodyRows: 10 }, view: {} } })
+  const band = await $.ui.mount({ ...PANE, surface: 'terminal' })
 
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   await band.press({ key: 'can-run' })

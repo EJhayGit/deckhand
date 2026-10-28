@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { parallelPrompt } from '../src/swarm'
 import { STARTERS } from '../src/agents/starters'
-import { BAND, PANE, START, turnEnds, world } from './world'
+import { PANE, START, turnEnds, world } from './world'
 
 const OFFER = { agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never
 
@@ -85,9 +85,8 @@ test('Lead makes swarm-lead active and sends the task to the chat', async ($, on
   await ui.press({ key: 'swarm-start' })
 
   expect(w.submitted).toEqual(['Ship the launch kit'])
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await band.find({ type: 'Text', text: /swarm-lead/ })).toBeDefined()
-  await band.unmount()
+  await ui.press({ key: 'tab-deck' })
+  expect(await ui.find({ type: 'Text', text: /swarm-lead/ })).toBeDefined()
   // While the lead is in use, the built-ins are offered to the model.
   expect(await $.agent.offer(OFFER)).not.toEqual({ isOffered: false })
   await ui.unmount()

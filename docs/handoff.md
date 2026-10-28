@@ -31,6 +31,12 @@
 
 ## Next step
 
+- Branch `band-layout` (unmerged): the active agent's chips moved off the
+  chat into the top of the Deck tab (`src/ui/chips.tsx`); nothing draws
+  above the prompt now. One row per label (Model, Effort, Can, Repeat), with
+  Stop / Save to agent beside the agent name. Owner: check it live from the
+  dev-mod copy, then merge.
+
 - Owner: `/plugin update`, restart, and run a task with swarm-lead in use;
   check that it starts deck agents and they show in Runs.
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.

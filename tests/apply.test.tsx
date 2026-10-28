@@ -50,7 +50,7 @@ test('the Default model chip leaves the session model alone', async ($, on) => {
   const seen = engineSteps(on)
   await $.session.start(START)
   await useAgent($, 'reviewer')
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const band = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
   await band.press({ key: 'model-default' })
   await band.press({ key: 'effort-max' })
@@ -75,7 +75,7 @@ test("the agent's instructions join the system prompt while it is active", async
   expect(after.sections[1]?.scope).toBe('session')
 })
 
-test('the band shows only while an agent is active, and its chips switch on and off', async ($, on) => {
+test('the chips show in the Deck only while an agent is active, never above the prompt', async ($, on) => {
   const w = world(on, { '.claude/agents/reviewer.md': agentFile('reviewer') })
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -84,14 +84,14 @@ test('the band shows only while an agent is active, and its chips switch on and 
   await $.session.start(START)
 
   for (const surface of ['terminal', 'desktop'] as const) {
-    const idle = await $.ui.mount({ ...BAND, surface })
-    expect(await idle.find({ type: 'Text', text: 'engine band' })).toBeDefined()
+    const idle = await $.ui.mount({ ...PANE, surface })
+    expect(await idle.find({ key: 'model-opus' })).toBeUndefined()
     await idle.unmount()
   }
 
   await useAgent($, 'reviewer')
   for (const surface of ['terminal', 'desktop'] as const) {
-    const band = await $.ui.mount({ ...BAND, surface })
+    const band = await $.ui.mount({ ...PANE, surface })
     const isOn = async (key: string) => (await band.find({ key }))?.props.variant === 'primary'
     expect((await band.find({ key: 'model-opus' }))?.text).toBe('Opus 5.5')
     await band.press({ key: 'model-opus' })
@@ -103,8 +103,11 @@ test('the band shows only while an agent is active, and its chips switch on and 
     await band.press({ key: 'effort-high' })
     expect(await isOn('effort-high')).toBe(false)
     await band.unmount()
+    const above = await $.ui.mount({ ...BAND, surface })
+    expect(await above.find({ type: 'Text', text: 'engine band' })).toBeDefined()
+    await above.unmount()
   }
-  // The status line stays clear: the band shows the agent.
+  // The status line stays clear: the Deck shows the agent.
   expect(w.status.every(s => s === undefined)).toBe(true)
 })
 
@@ -112,7 +115,7 @@ test('Save to agent appears when chips differ, and writes them to the file', asy
   const w = world(on, { '.claude/agents/reviewer.md': agentFile('reviewer') })
   await $.session.start(START)
   await useAgent($, 'reviewer')
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const band = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
   expect(await band.find({ key: 'save-chips' })).toBeUndefined()
   await band.press({ key: 'model-sonnet' })

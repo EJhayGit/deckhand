@@ -6,12 +6,11 @@ import { gatewayOptions } from '../src/gateway'
 import { codexAnswer, localAnswer } from '../src/gatewayTurn'
 import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit } from '../src/limits'
-import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
+import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, isHiddenAgent, showStatus } from '../src/session'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
-import { renderBand } from '../src/ui/band'
 import { DECK, renderDeck } from '../src/ui/deck'
 
 const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as string | null)
@@ -36,11 +35,6 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'deck' }, async ($, e) => ({ text: await runDeck($, e.args) }))
 
   on('ui.render', { component: 'Pane', requestId: DECK.id }, ($, e) => renderDeck($, e))
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const band = e.props.hasSurvey ? undefined : await renderBand($, e, () => stopLoop($))
-    return band ?? next(e)
-  })
 
   // The active agent's instructions, as one section at the end of the prompt.
   on('prompt.compose', async ($, e, next) => {

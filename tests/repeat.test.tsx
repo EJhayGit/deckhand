@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { afterTurn, start, tick } from '../src/repeat'
-import { BAND, PANE, START, agentFile, personSays, turnEnds, world } from './world'
+import { PANE, START, agentFile, personSays, turnEnds, world } from './world'
 
 test('pure: 3× runs three times, then stops as done', () => {
   let loop = start('x3', 'fix it', null)!
@@ -37,7 +37,7 @@ async function setup($: Engine, mode: string) {
   const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await pane.press({ key: 'use-reviewer' })
   await pane.unmount()
-  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const band = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await band.press({ key: `repeat-${mode}` })
   return band
 }

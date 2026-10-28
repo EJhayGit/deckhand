@@ -26,8 +26,8 @@ A **Deck** panel opens beside the chat.
    **+ New**, type a name, pick what it starts from, and click **Save**. The
    agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
    it too.
-2. Click **Use** on a card. A chip band appears above the prompt showing the
-   agent, model, effort and what it may do.
+2. Click **Use** on a card. Its chips appear at the top of the Deck tab,
+   showing the agent, model, effort and what it may do.
 3. Type your task as usual. The agent's instructions, model and effort apply
    to the chat, and its limits apply to every tool call.
 4. Click **None** (or `/deck none`) to go back to plain Claude Code.
@@ -66,7 +66,7 @@ Open the **Swarm** tab to run several agents on one task:
 Or type `/deck swarm launch-kit <task>` or `/deck swarm lead <task>`.
 
 Each agent in a swarm keeps its own limits: Claude Code holds it to the tools
-its file allows. The chip band's limits apply to the agent you clicked
+its file allows. The chips' limits apply to the agent you clicked
 **Use** on; swarm-lead allows everything so its helpers aren't blocked.
 
 ### Runs
@@ -75,7 +75,7 @@ The **Runs** tab shows every agent this session started, from a swarm or from
 Claude: its model and effort, steps, context use, tokens, estimated cost, time
 and a progress bar, with totals on top. Cost is an estimate from list prices.
 
-### The chip band
+### The chips
 
 - **Model:** Default, Haiku 5.5, Sonnet 5.5, Opus 5.5, Fable 5.1, Codex, Local.
   An agent file can name any of them by alias (`haiku`, `sonnet`, `opus`,
