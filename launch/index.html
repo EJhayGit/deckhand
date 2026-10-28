@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deckhand 0.2</title>
+<meta name="description" content="Deckhand is a Claude Code mod: a deck of reusable agents beside the chat. Version 0.2 adds 16 built-in agents, a Set up button for the plugins they use, a Runs view and optional swarms.">
+<meta property="og:title" content="Deckhand 0.2">
+<meta property="og:description" content="A deck of reusable agents beside the Claude Code chat, now with 16 built in.">
+<meta property="og:image" content="graphics/og-card.svg">
+<link rel="icon" type="image/svg+xml" href="graphics/icon.svg">
+<style>
+:root {
+  /* color: page */
+  --paper: #fcfcfd;
+  --ink: #1c1c1f;
+  --muted: #60646c;
+  --rule: #d9d9e0;
+  --link: #0d74ce;
+  /* color: the Deck panel, as the terminal draws it */
+  --panel: #1c1c1f;
+  --panel-ink: #edeef0;
+  --panel-muted: #b0b4ba;
+  --panel-rule: #3a3a40;
+  --panel-focus: #70b8ff;
+  /* color: weight words, from src/ui/status.ts */
+  --light: #30a46c;
+  --medium: #0090ff;
+  --careful: #f5a524;
+  --heavy: #f76b15;
+
+  /* type: 1.25 scale */
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --t-sm: 0.875rem;
+  --t-base: 1.0625rem;
+  --t-md: 1.25rem;
+  --t-lg: 1.563rem;
+  --t-xl: clamp(2.1rem, 6.4vw, 3.815rem);
+
+  /* space */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 1rem;
+  --s4: 1.5rem;
+  --s5: 2.5rem;
+  --s6: 4rem;
+  --s7: 6rem;
+
+  --measure: 66ch;
+  --wide: 76rem;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --round: 0.75rem;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--t-base)/1.55 var(--sans);
+}
+a { color: var(--link); text-underline-offset: 0.15em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; border-radius: 2px; }
+code, kbd { font-family: var(--mono); font-size: 0.92em; }
+h1, h2, h3 { font-family: var(--mono); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; margin: 0; }
+p, ul, ol, dl, dd { margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.wrap { max-width: var(--wide); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* header */
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); padding-block: var(--s4); }
+.brand { display: flex; align-items: center; gap: var(--s2); font-family: var(--mono); font-weight: 700; color: var(--ink); text-decoration: none; }
+.brand svg { width: 28px; height: 24px; }
+.top nav { display: flex; gap: var(--s4); font-size: var(--t-sm); }
+
+/* hero */
+.hero { padding-block: var(--s5) var(--s5); }
+.hero h1 { font-size: var(--t-xl); max-width: 16ch; }
+.lede { margin-top: var(--s4); max-width: var(--measure); font-size: var(--t-md); line-height: 1.5; color: var(--muted); }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+.install { margin-top: var(--s5); max-width: 44rem; }
+.install h2 { font-family: var(--sans); font-size: var(--t-base); font-weight: 600; letter-spacing: 0; }
+.cmd { margin-top: var(--s2); display: flex; align-items: stretch; border: 1px solid var(--ink); border-radius: var(--round); overflow: hidden; background: #fff; }
+.cmd pre { margin: 0; flex: 1; padding: var(--s3); white-space: pre-wrap; overflow-wrap: anywhere; font: var(--t-sm)/1.5 var(--mono); }
+.cmd button {
+  flex: none; border: 0; border-left: 1px solid var(--ink); padding: 0 var(--s4);
+  background: var(--ink); color: var(--paper); font: 600 var(--t-sm) var(--sans); cursor: pointer;
+}
+.cmd button:hover { background: #33333a; }
+.cmd button:focus-visible { outline-offset: -4px; outline-color: var(--paper); }
+.install p { margin-top: var(--s2); font-size: var(--t-sm); color: var(--muted); }
+
+/* the Deck panel */
+.deck {
+  background: var(--panel); color: var(--panel-ink);
+  border-radius: calc(var(--round) * 1.5);
+  padding: var(--s4) clamp(var(--s3), 3vw, var(--s5)) var(--s2);
+}
+.deck :focus-visible { outline-color: var(--panel-focus); }
+.deck-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--s2) var(--s4); padding-bottom: var(--s3); }
+.deck-head h2 { font-size: var(--t-md); }
+.deck-head p { font-size: var(--t-sm); color: var(--panel-muted); max-width: 48ch; }
+
+.group { border-top: 1px solid var(--panel-rule); }
+.group summary {
+  display: flex; align-items: baseline; gap: var(--s2);
+  padding-block: var(--s3); cursor: pointer; list-style: none;
+}
+.group summary::-webkit-details-marker { display: none; }
+.group summary::before { content: "\25BE"; font-family: var(--mono); color: var(--panel-muted); width: 1ch; }
+.group:not([open]) summary::before { content: "\25B8"; }
+.group h3 { font-size: var(--t-base); }
+.group summary span { font-size: var(--t-sm); color: var(--panel-muted); }
+
+.crew {
+  list-style: none; padding: 0 0 var(--s4);
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+}
+.crew li {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  border: 1px solid var(--panel-rule); border-radius: var(--round);
+  padding: var(--s3);
+}
+.m { flex: none; width: 42px; height: 36px; color: var(--c); shape-rendering: crispEdges; }
+.crew b { display: block; font-family: var(--mono); font-size: var(--t-sm); overflow-wrap: anywhere; }
+.meta { font-size: var(--t-sm); color: var(--panel-muted); }
+.w-light { color: var(--light); }
+.w-medium { color: var(--medium); }
+.w-careful { color: var(--careful); }
+.w-heavy { color: var(--heavy); }
+.crew p { margin-top: var(--s1); font-size: var(--t-sm); line-height: 1.45; color: var(--panel-muted); }
+.crew .with { color: var(--panel-ink); }
+
+/* the one load moment: the crew steps onto the deck */
+@media (prefers-reduced-motion: no-preference) {
+  .m { animation: board 360ms steps(3, end) both; animation-delay: calc(var(--i) * 45ms + 150ms); }
+  @keyframes board { from { transform: translateY(9px); opacity: 0; } }
+}
+
+/* sections */
+.section { padding-block: var(--s7) 0; }
+.section > h2 { font-size: var(--t-lg); max-width: 24ch; }
+.section > .intro { margin-top: var(--s3); max-width: var(--measure); color: var(--muted); }
+
+.news { margin-top: var(--s5); border-top: 1px solid var(--rule); }
+.news > div { display: grid; gap: var(--s2) var(--s5); padding-block: var(--s4); border-bottom: 1px solid var(--rule); }
+.news dt { font-family: var(--mono); font-weight: 700; }
+.news dd { max-width: var(--measure); }
+.news dd + dd { margin-top: var(--s2); color: var(--muted); font-size: var(--t-sm); }
+
+/* launch plan */
+.plan { margin-top: var(--s5); border-top: 2px solid var(--ink); }
+.plan > section { display: grid; gap: var(--s2) var(--s5); padding-block: var(--s4) var(--s5); border-bottom: 1px solid var(--rule); }
+.plan h3 { font-size: var(--t-md); }
+.plan-body { max-width: var(--measure); }
+.plan-body > * + * { margin-top: var(--s3); }
+.plan ul, .plan ol { padding-left: 1.25rem; }
+.plan li + li { margin-top: var(--s2); }
+.plan ol li::marker { font-family: var(--mono); font-weight: 700; }
+.plan .note { font-size: var(--t-sm); color: var(--muted); }
+
+footer { margin-top: var(--s7); padding-block: var(--s5); border-top: 1px solid var(--rule); font-size: var(--t-sm); color: var(--muted); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); justify-content: space-between; }
+
+@media (min-width: 48rem) {
+  .hero { padding-block: var(--s6) var(--s5); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s4); align-items: start; }
+  .news > div { grid-template-columns: 15rem 1fr; }
+  .news dd { grid-column: 2; }
+  .news dd + dd { margin-top: 0; }
+  .plan > section { grid-template-columns: 15rem 1fr; }
+}
+@media (max-width: 30rem) {
+  .top nav a:first-child { display: none; }
+  .cmd { flex-direction: column; }
+  .cmd button { border-left: 0; border-top: 1px solid var(--ink); padding: var(--s3); }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Pixel buddies from src/ui/mascot.ts: a 14 x 12 grid, hat rows 0-2, body rows 3-11. -->
+  <symbol id="body" viewBox="0 0 14 12">
+    <path fill="currentColor" d="M2 3h10v3H2zM0 6h14v2H0zM2 8h10v2H2zM2 10h1v2H2zM4 10h1v2H4zM9 10h1v2H9zM11 10h1v2h-1z"/>
+    <path fill="#1c1c1f" d="M4 5h1v1H4zM9 5h1v1H9z"/>
+  </symbol>
+  <symbol id="cap" viewBox="0 0 14 12"><path fill="#3e63dd" d="M4 0h6v1H4zM3 1h8v1H3zM2 2h12v1H2z"/></symbol>
+  <symbol id="hardhat" viewBox="0 0 14 12"><path fill="#ffc53d" d="M5 0h4v1H5zM3 1h8v1H3zM1 2h12v1H1z"/></symbol>
+  <symbol id="headphones" viewBox="0 0 14 12"><path fill="#5b5bd6" d="M3 0h8v1H3zM2 1h1v1H2zM11 1h1v1h-1z"/><path fill="#e5484d" d="M1 2h2v1H1zM11 2h2v1h-2z"/></symbol>
+  <symbol id="beret" viewBox="0 0 14 12"><path fill="#d6409f" d="M7 0h1v1H7zM3 1h7v1H3zM2 2h9v1H2z"/></symbol>
+  <symbol id="antenna" viewBox="0 0 14 12"><path fill="#e5484d" d="M7 0h1v1H7z"/><path fill="#8b8d98" d="M7 1h1v2H7z"/></symbol>
+  <symbol id="crown" viewBox="0 0 14 12"><path fill="#ffc53d" d="M6 0h1v1H6zM3 1h7v2H3z"/><path fill="#e5484d" d="M3 0h1v1H3zM9 0h1v1H9z"/></symbol>
+</svg>
+
+<header class="wrap top">
+  <a class="brand" href="#top" aria-label="Deckhand home">
+    <svg viewBox="0 0 14 12" style="color:#ffc53d" aria-hidden="true"><use href="#body"/><use href="#crown"/></svg>
+    Deckhand
+  </a>
+  <nav aria-label="Page">
+    <a href="#new">What's new</a>
+    <a href="#plan">Launch plan</a>
+    <a href="https://github.com/EJhayGit/deckhand">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <h1>Sixteen agents, one click from the chat</h1>
+    <p class="lede"><strong>Deckhand is a Claude Code mod: a deck of reusable agents beside the chat.</strong> Make an agent once, use it in any project, and keep it inside the limits you set. Version 0.2 fills every deck with built-in agents, shows what each running agent costs, and can put several agents on one task.</p>
+
+    <section class="install" aria-labelledby="install-h">
+      <h2 id="install-h">Install from a Claude Code terminal session</h2>
+      <div class="cmd">
+        <pre><code id="install-line">/plugin install deckhand --marketplace EJhayGit/deckhand</code></pre>
+        <button type="button" id="copy">Copy</button>
+      </div>
+      <span class="sr" role="status" id="copy-status"></span>
+      <p>Answer <kbd>y</kbd> to add the marketplace, then pick a scope. In the desktop app, click <b>+</b> next to the prompt box, then <b>Plugins</b>, <b>Add marketplace</b> with <code>EJhayGit/deckhand</code>, then <b>Add plugin</b>. A Deck panel opens beside the chat.</p>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="deck" aria-labelledby="deck-h">
+      <div class="deck-head">
+        <h2 id="deck-h">The built-in deck</h2>
+        <p>Every deck now starts with these 16. Click <b>Use</b> on a card and its instructions, model and effort apply to the chat. Click a group's name to fold it.</p>
+      </div>
+
+      <details class="group" open>
+        <summary><h3>Core</h3> <span>8 agents</span></summary>
+        <ul class="crew">
+          <li><svg class="m" style="--c:#0090ff;--i:0" aria-hidden="true"><use href="#body"/><use href="#cap"/></svg><div><b>reviewer</b><span class="meta"><span class="w-careful">careful</span> Sonnet · high</span><p>Reviews code or a diff for real bugs and risks, most serious first. Changes nothing.</p></div></li>
+          <li><svg class="m" style="--c:#f76b15;--i:1" aria-hidden="true"><use href="#body"/><use href="#hardhat"/></svg><div><b>bug-fixer</b><span class="meta"><span class="w-medium">medium</span> Sonnet · medium</span><p>Finds the root cause of the bug you describe and fixes it with the smallest change.</p></div></li>
+          <li><svg class="m" style="--c:#8e4ec6;--i:2" aria-hidden="true"><use href="#body"/><use href="#antenna"/></svg><div><b>test-runner</b><span class="meta"><span class="w-light">light</span> Haiku · low</span><p>Runs the tests and reports what failed and the likely cause. Changes nothing.</p></div></li>
+          <li><svg class="m" style="--c:#8e4ec6;--i:3" aria-hidden="true"><use href="#body"/><use href="#antenna"/></svg><div><b>test-writer</b><span class="meta"><span class="w-medium">medium</span> Sonnet · medium</span><p>Writes focused tests for new or untested behavior, in the style the project already uses.</p></div></li>
+          <li><svg class="m" style="--c:#30a46c;--i:4" aria-hidden="true"><use href="#body"/><use href="#beret"/></svg><div><b>docs-writer</b><span class="meta"><span class="w-light">light</span> Haiku · low</span><p>Writes and updates docs in plain words. Touches only documentation.</p></div></li>
+          <li><svg class="m" style="--c:#ffc53d;--i:5" aria-hidden="true"><use href="#body"/><use href="#cap"/></svg><div><b>planner</b><span class="meta"><span class="w-careful">careful</span> Opus · high</span><p>Turns a feature request into a short, ordered plan with files, risks and checks. Writes no code.</p></div></li>
+          <li><svg class="m" style="--c:#ffc53d;--i:6" aria-hidden="true"><use href="#body"/><use href="#antenna"/></svg><div><b>researcher</b><span class="meta"><span class="w-medium">medium</span> Sonnet · medium</span><p>Researches a question on the web and in the code, and answers with dated sources.</p></div></li>
+          <li><svg class="m" style="--c:#30a46c;--i:7" aria-hidden="true"><use href="#body"/><use href="#hardhat"/></svg><div><b>refactorer</b><span class="meta"><span class="w-medium">medium</span> Sonnet · medium</span><p>Simplifies code without changing what it does, with tests run before and after.</p></div></li>
+        </ul>
+      </details>
+
+      <details class="group" open>
+        <summary><h3>Design</h3> <span>3 agents</span></summary>
+        <ul class="crew">
+          <li><svg class="m" style="--c:#d6409f;--i:8" aria-hidden="true"><use href="#body"/><use href="#beret"/></svg><div><b>frontend-designer</b><span class="meta"><span class="w-careful">careful</span> Opus · high</span><p>Designs and builds distinctive web pages and app screens that do not look generated. <span class="with">Uses taste-skill.</span></p></div></li>
+          <li><svg class="m" style="--c:#d6409f;--i:9" aria-hidden="true"><use href="#body"/><use href="#beret"/></svg><div><b>ui-critic</b><span class="meta"><span class="w-careful">careful</span> Sonnet · high</span><p>Critiques a screen or page for hierarchy, spacing, contrast and the generated look. Changes nothing. <span class="with">Uses taste-skill.</span></p></div></li>
+          <li><svg class="m" style="--c:#0090ff;--i:10" aria-hidden="true"><use href="#body"/><use href="#headphones"/></svg><div><b>graphics-designer</b><span class="meta"><span class="w-medium">medium</span> Sonnet · medium</span><p>Makes launch graphics, icons, social and OG images, and color themes as SVG or code.</p></div></li>
+        </ul>
+      </details>
+
+      <details class="group" open>
+        <summary><h3>Security</h3> <span>3 agents</span></summary>
+        <ul class="crew">
+          <li><svg class="m" style="--c:#e5484d;--i:11" aria-hidden="true"><use href="#body"/><use href="#hardhat"/></svg><div><b>security-auditor</b><span class="meta"><span class="w-heavy">heavy</span> Opus · xhigh</span><p>Audits the codebase for exploitable security bugs and verifies each finding. Changes nothing. <span class="with">Uses Trail of Bits skills.</span></p></div></li>
+          <li><svg class="m" style="--c:#e5484d;--i:12" aria-hidden="true"><use href="#body"/><use href="#hardhat"/></svg><div><b>dependency-auditor</b><span class="meta"><span class="w-careful">careful</span> Sonnet · high</span><p>Audits dependencies for known vulnerabilities, risky packages and lockfile problems. <span class="with">Uses Trail of Bits skills.</span></p></div></li>
+          <li><svg class="m" style="--c:#f76b15;--i:13" aria-hidden="true"><use href="#body"/><use href="#hardhat"/></svg><div><b>change-security-review</b><span class="meta"><span class="w-careful">careful</span> Sonnet · high</span><p>Reviews the current branch or a diff for security regressions before it merges. <span class="with">Uses Trail of Bits skills.</span></p></div></li>
+        </ul>
+      </details>
+
+      <div class="pair">
+      <details class="group" open>
+        <summary><h3>Web</h3> <span>1 agent</span></summary>
+        <ul class="crew">
+          <li><svg class="m" style="--c:#30a46c;--i:14" aria-hidden="true"><use href="#body"/><use href="#antenna"/></svg><div><b>website-reviewer</b><span class="meta"><span class="w-careful">careful</span> Sonnet · high</span><p>Reviews a live website for speed, accessibility, SEO, broken links, console errors and mobile layout. Give it a URL. <span class="with">Uses Playwright or Chrome DevTools.</span></p></div></li>
+        </ul>
+      </details>
+
+      <details class="group" open>
+        <summary><h3>Lead</h3> <span>1 agent</span></summary>
+        <ul class="crew">
+          <li><svg class="m" style="--c:#ffc53d;--i:15" aria-hidden="true"><use href="#body"/><use href="#crown"/></svg><div><b>swarm-lead</b><span class="meta"><span class="w-careful">careful</span> Opus · high</span><p>Splits a big task into parts, hands each to the best deck agent in parallel, then checks and merges the results.</p></div></li>
+        </ul>
+      </details>
+      </div>
+    </section>
+  </div>
+
+  <section class="wrap section" id="new" aria-labelledby="new-h">
+    <h2 id="new-h">What's new in 0.2</h2>
+    <p class="intro">The deck, the limits and the chip band work as they did in 0.1. These are the additions.</p>
+    <dl class="news">
+      <div>
+        <dt>Built-in agents</dt>
+        <dd>Sixteen agents in foldable groups: Core, Design, Security, Web and Lead. The old starters have new, fuller instructions.</dd>
+        <dd>A file in <code>.claude/agents/</code> with the same name replaces the built-in card.</dd>
+      </div>
+      <div>
+        <dt>Set up</dt>
+        <dd>Some agents work best with a plugin, and their cards say <b>needs …</b>. Click <b>Set up</b>, then <b>Add</b>: Deckhand adds the plugins to this project's <code>.claude/settings.json</code>, and Claude Code offers to install them when you restart it.</dd>
+        <dd>Nothing global is changed.</dd>
+      </div>
+      <div>
+        <dt>Runs</dt>
+        <dd>The Runs tab shows every agent this session started, from a swarm or from Claude: its model and effort, steps, context use, tokens, estimated cost, time and a progress bar, with totals on top.</dd>
+        <dd>Cost is an estimate from list prices.</dd>
+      </div>
+      <div>
+        <dt>Swarms</dt>
+        <dd><b>Parallel</b>: pick a preset (Launch kit, Security sweep, Ship check) or tick agents, type the task, and click <b>Start</b>. <b>Lead</b>: swarm-lead takes the task, splits it, and hands parts to the deck's agents.</dd>
+        <dd>Optional. From the prompt: <code>/deck swarm launch-kit &lt;task&gt;</code> or <code>/deck swarm lead &lt;task&gt;</code>.</dd>
+      </div>
+      <div>
+        <dt>Cards and effort</dt>
+        <dd>A new card look with a pixel mascot, a colored weight word, and the model and effort. An XHigh chip joins the effort choices.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="wrap section" id="plan" aria-labelledby="plan-h">
+    <h2 id="plan-h">Launch plan</h2>
+    <p class="intro">One page for launch day. The targets are left open on purpose: Deckhand collects no usage data, so the first week sets the baseline.</p>
+
+    <div class="plan">
+      <section aria-labelledby="goal-h">
+        <h3 id="goal-h">Goal</h3>
+        <div class="plan-body">
+          <p>Get Claude Code users to install 0.2 and put a built-in agent to work on a real task in their own project, in the first session.</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="aud-h">
+        <h3 id="aud-h">Audience</h3>
+        <div class="plan-body">
+          <ul>
+            <li>Claude Code users who already keep agents in <code>.claude/agents/</code> and want them one click away, with limits they can see.</li>
+            <li>People who want a reviewer, planner or test runner without writing one first.</li>
+            <li>Users of taste-skill and Trail of Bits skills, whose plugins the Design and Security agents set up.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section aria-labelledby="ch-h">
+        <h3 id="ch-h">Channels</h3>
+        <div class="plan-body">
+          <ul>
+            <li>The GitHub repo: README, a 0.2.0 release built from the changelog, and this page.</li>
+            <li>The marketplace itself, <code>EJhayGit/deckhand</code>, which is where installs happen.</li>
+            <li>One social post with the OG card and a short screen recording of the Deck, a swarm and the Runs tab.</li>
+            <li>Claude Code community spaces where people share plugins.</li>
+            <li>A note to the taste-skill and Trail of Bits skills maintainers that Set up points at their plugins.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section aria-labelledby="day-h">
+        <h3 id="day-h">Launch day</h3>
+        <div class="plan-body">
+          <ol>
+            <li>Add a LICENSE file, then merge 0.2 to main and publish the 0.2.0 GitHub release with the changelog text.</li>
+            <li>In a clean project, install with the line above in a terminal session, then again through the desktop app. Click <b>Use</b> on one agent from each group and run <b>Set up</b> once.</li>
+            <li>Publish this page with the OG card and icon from <code>launch/graphics/</code>. Export the OG card as a PNG at a full web address first: most social sites don't show SVG share images.</li>
+            <li>Record the Deck, a Parallel swarm and the Runs tab, then post it with the install line.</li>
+            <li>Share in community spaces and send the maintainer notes.</li>
+            <li>Stay on GitHub issues and the post replies for the rest of the day. Fix install blockers first.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="measure-h">
+        <h3 id="measure-h">What to measure</h3>
+        <div class="plan-body">
+          <ul>
+            <li>Repo views, unique visitors and clones, from GitHub's Insights, Traffic page.</li>
+            <li>New stars and forks in the first week.</li>
+            <li>Issues opened, sorted into install problems, bugs and requests.</li>
+            <li>Which built-in agents people name in issues and replies.</li>
+            <li>Questions about Set up, swarms and the cost estimate: each one points at a doc to fix.</li>
+            <li>Replies and shares on the launch post.</li>
+          </ul>
+          <p class="note">Write the first-week numbers into <code>docs/handoff.md</code> so 0.3 has something to compare against.</p>
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Deckhand 0.2.0, a Claude Code mod.</span>
+    <span><a href="https://github.com/EJhayGit/deckhand">Source on GitHub</a> &nbsp; <a href="https://github.com/EJhayGit/deckhand/blob/main/CHANGELOG.md">Changelog</a></span>
+  </div>
+</footer>
+
+<script>
+document.getElementById('copy').addEventListener('click', async function () {
+  var status = document.getElementById('copy-status')
+  try {
+    await navigator.clipboard.writeText(document.getElementById('install-line').textContent)
+    this.textContent = 'Copied'
+    status.textContent = 'Install line copied'
+  } catch (e) {
+    getSelection().selectAllChildren(document.getElementById('install-line'))
+    status.textContent = 'Copy failed. The line is selected: press Ctrl+C or Cmd+C.'
+  }
+  setTimeout(() => { this.textContent = 'Copy' }, 2000)
+})
+</script>
+</body>
+</html>

@@ -1,16 +1,21 @@
-// The Deck panel: one card per agent, and the form when one is open.
+// The Deck panel: tabs, one card per agent in collapsible groups, and the
+// form when one is open.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import type { DeckAgent, View } from '../../types'
+import type { DeckAgent, DeckTab, View } from '../../types'
 import { refreshDeck, removeAgent, saveToLibrary, writeAgent } from '../agents/library'
-import { STARTERS } from '../agents/starters'
+import { GROUPS, STARTERS } from '../agents/starters'
 import { LOCAL_HINT } from '../gateway'
 import { badges } from '../limits'
 import { routeOf } from '../models'
+import { SETTINGS_PATH, missingPlugins, pluginName, withPlugins } from '../plugins'
 import { useAgent, useNone } from '../session'
 import { renderForm } from './form'
-import { COLORS, iconText, modelLabel } from './status'
+import { mascotSvg } from './mascot'
+import { renderRuns } from './runs'
+import { COLORS, iconText, modelText, weightOf } from './status'
+import { renderSwarm } from './swarm'
 
 export const DECK = { id: 'deck', title: 'Deck' }
 
@@ -19,6 +24,16 @@ const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as stri
 const view = atom({ plugin: 'deckhand', key: 'view' } as const, { kind: 'deck' } as View)
 const menu = atom({ plugin: 'deckhand', key: 'menu' } as const, null as string | null)
 const confirm = atom({ plugin: 'deckhand', key: 'confirm' } as const, null as string | null)
+const tab = atom({ plugin: 'deckhand', key: 'tab' } as const, 'deck' as DeckTab)
+const collapsed = atom({ plugin: 'deckhand', key: 'collapsed' } as const, [] as string[])
+const setup = atom({ plugin: 'deckhand', key: 'setup' } as const, null as string | null)
+const enabledPlugins = atom({ plugin: 'deckhand', key: 'enabledPlugins' } as const, [] as string[])
+
+const TABS: readonly { id: DeckTab; label: string }[] = [
+  { id: 'deck', label: 'Deck' },
+  { id: 'runs', label: 'Runs' },
+  { id: 'swarm', label: 'Swarm' },
+]
 
 // A function declaration: validate only follows `$` past an import into one.
 export async function renderDeck($: EngineInterface, e: RenderInput) {
@@ -26,10 +41,8 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
   if (shown.kind === 'form') return renderForm($, e, shown.draft)
 
   const { Box, Text, Button } = $.ui.resolve(e)
-  const cards = await read($, deck)
-  const inUse = await read($, active)
-  const open = await read($, menu)
-  const asked = await read($, confirm)
+  const now = await read($, tab)
+  const body = now === 'runs' ? await renderRuns($, e) : now === 'swarm' ? await renderSwarm($, e) : await renderCards($, e)
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -37,51 +50,108 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
         <Text bold>Deck</Text>
         <Button key="new" label="+ New" onPress={() => openNew($)} />
       </Box>
-      {cards.length === 0 && <Text dimColor>Deck is empty</Text>}
-      {cards.map(card => renderCard($, e, card, card.agent.name === inUse, open === card.agent.name, asked === card.agent.name))}
-      <Box key="new-card" borderStyle="round" borderDimColor flexDirection="row">
-        <Button key="new-card" plain label="+ New agent" onPress={() => openNew($)} />
+      <Box flexDirection="row" gap={1}>
+        {TABS.map(t => (
+          <Button key={`tab-${t.id}`} label={t.label} variant={t.id === now ? 'primary' : 'secondary'} onPress={() => update($, tab, () => t.id)} />
+        ))}
       </Box>
+      {body}
+    </Box>
+  )
+}
+
+async function renderCards($: EngineInterface, e: RenderInput) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const cards = await read($, deck)
+  const inUse = await read($, active)
+  const open = await read($, menu)
+  const asked = await read($, confirm)
+  const shut = await read($, collapsed)
+  const settingUp = await read($, setup)
+  const enabled = await read($, enabledPlugins)
+  const groups = ['Mine', ...GROUPS].map(g => ({ name: g, cards: cards.filter(c => (c.group ?? 'Mine') === g) })).filter(g => g.cards.length > 0)
+
+  return (
+    <Box flexDirection="column" gap={1}>
       <Box flexDirection="row" gap={1}>
         <Button key="none" label={inUse === null ? '● None' : 'None'} dimColor={inUse === null} onPress={() => useNone($)} />
         <Text dimColor>{inUse === null ? 'No agent: Claude Code as usual' : `In use: ${inUse}`}</Text>
+      </Box>
+      {groups.map(g => {
+        const isShut = shut.includes(g.name)
+        return (
+          <Box key={`group-box-${g.name}`} flexDirection="column" gap={1}>
+            <Button key={`group-${g.name}`} plain label={`${isShut ? '▸' : '▾'} ${g.name} · ${g.cards.length}`} onPress={() => update($, collapsed, now => (isShut ? now.filter(n => n !== g.name) : [...now, g.name]))} />
+            {!isShut && g.cards.map(card => renderCard($, e, card, {
+              isActive: card.agent.name === inUse,
+              isMenuOpen: open === card.agent.name,
+              isAsked: asked === card.agent.name,
+              isSettingUp: settingUp === card.agent.name,
+              missing: missingPlugins(card.agent, enabled),
+            }))}
+          </Box>
+        )
+      })}
+      <Box key="new-card" borderStyle="round" borderDimColor flexDirection="row">
+        <Button key="new-card" plain label="+ New agent" onPress={() => openNew($)} />
       </Box>
     </Box>
   )
 }
 
-function renderCard($: EngineInterface, e: RenderInput, card: DeckAgent, isActive: boolean, isMenuOpen: boolean, isAsked: boolean) {
+type CardState = { isActive: boolean; isMenuOpen: boolean; isAsked: boolean; isSettingUp: boolean; missing: string[] }
+
+function renderCard($: EngineInterface, e: RenderInput, card: DeckAgent, s: CardState) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const { agent } = card
   const name = agent.name
-  const summary = [modelLabel(agent.model), agent.description].filter(s => s !== '').join(' · ')
+  const weight = weightOf(agent.effort)
   const tags = [...badges(agent.limits), ...(card.source === 'library' ? ['library'] : [])]
 
   return (
-    <Box key={`card-${name}`} flexDirection="column" borderStyle="round" borderColor={isActive ? 'success' : undefined} paddingX={1}>
+    <Box key={`card-${name}`} flexDirection="column" borderStyle="round" borderColor={s.isActive ? 'success' : undefined} paddingX={1}>
       <Box flexDirection="row" gap={1}>
         {renderIcon($, e, card)}
         <Box flexDirection="column" flexShrink={1}>
           <Text bold>{name}</Text>
-          <Text dimColor wrap="truncate-end">{summary}</Text>
+          <Box flexDirection="row" gap={1}>
+            {weight && <Text color={weight.color}>{weight.word}</Text>}
+            <Text dimColor>{[modelText(agent.model), agent.effort].filter(Boolean).join(' · ')}</Text>
+          </Box>
+          {agent.description !== '' && <Text dimColor wrap="truncate-end">{agent.description}</Text>}
           <Text dimColor>{tags.map(t => `[${t}]`).join(' ')}</Text>
           {routeOf(agent.model).kind === 'local' && <Text dimColor>{LOCAL_HINT}</Text>}
+          {s.missing.length > 0 && (
+            <Box flexDirection="row" gap={1}>
+              <Text color="warning">needs {s.missing.map(pluginName).join(', ')}</Text>
+              <Button key={`setup-${name}`} label="Set up" onPress={() => update($, setup, () => name)} />
+            </Box>
+          )}
         </Box>
       </Box>
+      {s.isSettingUp && (
+        <Box flexDirection="column">
+          <Text>Add {s.missing.join(', ')} to this project's {SETTINGS_PATH}? Claude Code offers to install them on restart.</Text>
+          <Box flexDirection="row" gap={1}>
+            <Button key={`confirm-setup-${name}`} label="Add" variant="primary" onPress={() => setUp($, s.missing)} />
+            <Button key={`cancel-setup-${name}`} label="Cancel" onPress={() => update($, setup, () => null)} />
+          </Box>
+        </Box>
+      )}
       <Box flexDirection="row" gap={1}>
-        <Button key={`use-${name}`} label={isActive ? 'In use' : 'Use'} variant={isActive ? 'primary' : 'secondary'} onPress={() => useAgent($, name)} />
+        <Button key={`use-${name}`} label={s.isActive ? 'In use' : 'Use'} variant={s.isActive ? 'primary' : 'secondary'} onPress={() => useAgent($, name)} />
         <Button key={`edit-${name}`} label="Edit" onPress={() => openEdit($, name)} />
         <Button key={`more-${name}`} label="…" onPress={() => update($, menu, now => (now === name ? null : name))} />
       </Box>
-      {isMenuOpen && (
-        <Box flexDirection="row" gap={1}>
+      {s.isMenuOpen && (
+        <Box flexDirection="row" gap={1} flexWrap="wrap">
           <Button key={`dup-${name}`} label="Duplicate" onPress={() => duplicate($, name)} />
           <Button key={`lib-${name}`} label={card.isInLibrary ? 'Update my library' : 'Save to my library'} onPress={() => toLibrary($, name)} />
-          {card.source === 'library' && <Button key={`add-${name}`} label="Add to this project" onPress={() => toProject($, name)} />}
-          <Button key={`del-${name}`} label="Delete" onPress={() => update($, confirm, () => name)} />
+          {card.source !== 'project' && <Button key={`add-${name}`} label="Add to this project" onPress={() => toProject($, name)} />}
+          {card.source !== 'builtin' && <Button key={`del-${name}`} label="Delete" onPress={() => update($, confirm, () => name)} />}
         </Box>
       )}
-      {isAsked && (
+      {s.isAsked && (
         <Box flexDirection="row" gap={1}>
           <Text color="error">Delete {name}{card.source === 'library' ? ' from your library' : ''}?</Text>
           <Button key={`confirm-del-${name}`} label="Delete" onPress={() => remove($, name)} />
@@ -92,13 +162,14 @@ function renderCard($: EngineInterface, e: RenderInput, card: DeckAgent, isActiv
   )
 }
 
-function renderIcon($: EngineInterface, e: RenderInput, card: DeckAgent) {
-  const color = COLORS[card.agent.color ?? ''] ?? COLORS.gray
+export function renderIcon($: EngineInterface, e: RenderInput, card: Pick<DeckAgent, 'agent' | 'iconSvg' | 'hat'>) {
+  const color = COLORS[card.agent.color ?? ''] ?? COLORS.gray!
   const elements = $.ui.resolve(e)
-  // The terminal has no Svg: uploaded icons fall back to the emoji or letter there.
-  if (e.surface !== 'terminal' && 'Svg' in elements && card.iconSvg) {
+  // The terminal has no Svg: icons fall back to the emoji or letter there.
+  if (e.surface !== 'terminal' && 'Svg' in elements) {
     const { Svg } = elements
-    return <Svg source={card.iconSvg} alt={card.agent.name} width={32} height={32} />
+    if (card.iconSvg) return <Svg source={card.iconSvg} alt={card.agent.name} width={32} height={32} />
+    if (card.hat) return <Svg source={mascotSvg(color, card.hat)} alt={card.agent.name} width={35} height={30} />
   }
   const { Box, Text } = elements
 
@@ -150,6 +221,20 @@ async function toProject($: EngineInterface, name: string) {
   await $.fs.write(`.claude/agents/${name}.md`, card.text)
   await update($, menu, () => null)
   await refreshDeck($)
+}
+
+// Project settings only; never ~/.claude. Runs after the person pressed Add.
+async function setUp($: EngineInterface, specs: string[]) {
+  await update($, setup, () => null)
+  const old = await $.fs.read(SETTINGS_PATH).catch(() => undefined)
+  const text = withPlugins(typeof old === 'string' ? old : undefined, specs)
+  if (text === undefined) {
+    $.ui.toast(`${SETTINGS_PATH} isn't valid JSON, so Deckhand left it alone. Fix it and try again.`)
+    return
+  }
+  await $.fs.write(SETTINGS_PATH, text)
+  await update($, enabledPlugins, now => [...new Set([...now, ...specs])])
+  $.ui.toast(`Added ${specs.map(pluginName).join(', ')}. Restart Claude Code and accept the install prompt, or run /plugin.`)
 }
 
 async function remove($: EngineInterface, name: string) {

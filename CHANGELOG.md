@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 (2026-10-28)
+
+- 16 built-in agents in every deck, in foldable groups: Core, Design,
+  Security, Web and Lead. The old starters have new, fuller instructions.
+- Agents can name plugins and preload skills. **Set up** adds a missing plugin
+  to the project's `.claude/settings.json` after you confirm.
+- New card look: pixel mascots, a colored weight word, model and effort.
+- Runs tab: every agent the session started, with steps, context, tokens,
+  estimated cost, time, a progress bar and totals.
+- Optional swarms: Parallel (presets or a custom pick) and Lead (swarm-lead
+  delegates). `/deck swarm`.
+- XHigh effort chip.
+
 ## 0.1.0 (2026-10-28)
 
 First release.

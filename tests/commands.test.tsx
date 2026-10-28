@@ -13,6 +13,24 @@ test('pure: /deck arguments parse', () => {
   expect(parseDeck('limits')).toEqual({ kind: 'limits' })
   expect(parseDeck('use')).toEqual({ kind: 'help' })
   expect(parseDeck('dance')).toEqual({ kind: 'help' })
+  expect(parseDeck('swarm ship-check before the release')).toEqual({ kind: 'swarm', preset: 'ship-check', task: 'before the release' })
+  expect(parseDeck('swarm lead')).toEqual({ kind: 'help' })
+})
+
+test('/deck swarm starts a preset, or hands the task to the lead', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+
+  expect((await $.command.run(deck('swarm nope do it'))).text).toBe('Swarm takes launch-kit, security-sweep, ship-check or lead, then the task.')
+  expect((await $.command.run(deck('swarm security-sweep check auth'))).text).toBe('Asked Claude to start Security sweep: security-auditor, dependency-auditor, change-security-review.')
+  // A command can't submit while it holds the turn: the prompt goes right after.
+  expect(w.submitted).toEqual([])
+  await clock.advance(1)
+  expect(w.submitted[0]).toContain('`deckhand:security-auditor`: Audit the code for security bugs')
+  expect((await $.command.run(deck('swarm lead ship the kit'))).text).toBe('swarm-lead has the task.')
+  await clock.advance(1)
+  expect(w.submitted[1]).toBe('ship the kit')
 })
 
 test('/deck is registered, and opens the panel', async ($, on) => {
@@ -35,7 +53,7 @@ test('/deck use and /deck none switch the agent', async ($, on) => {
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
   await pane.unmount()
 
-  expect((await $.command.run(deck('use ghost'))).text).toBe('No agent called ghost. Agents: reviewer.')
+  expect((await $.command.run(deck('use ghost'))).text).toMatch(/^No agent called ghost\. Agents: reviewer, .*swarm-lead\.$/)
   expect((await $.command.run(deck('none'))).text).toBe('No agent in use. Claude Code is back to normal.')
   expect(w.status.at(-1)).toBe(undefined)
 })

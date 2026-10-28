@@ -8,7 +8,9 @@ import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
 import { routeOf } from '../src/models'
-import { current, showStatus } from '../src/session'
+import { current, isHiddenAgent, showStatus } from '../src/session'
+import { closeSwarm } from '../src/swarm'
+import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { renderBand } from '../src/ui/band'
 import { DECK, renderDeck } from '../src/ui/deck'
 
@@ -22,6 +24,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register(COMMAND)
+    await $.tool.register(PROGRESS_TOOL).catch(() => undefined)
     await clearLoop($)
     await refreshDeck($)
     await showStatus($)
@@ -44,10 +47,23 @@ export const register: Register = (on, options) => {
     const composed = await next(e)
     const now = await current($)
     if (!now || now.card.agent.body.trim() === '') return composed
-    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}`
+    const skills = now.card.agent.skills?.length ? `\n\nUse these skills when they apply: ${now.card.agent.skills.join(', ')}.` : ''
+    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}${skills}`
 
     return { sections: [...composed.sections, { id: 'deckhand:agent', text, scope: 'session' as const }] }
   })
+
+  on('agent.offer', async ($, e, next) => ((await isHiddenAgent($, e.agent)) ? { isOffered: false } : next(e)))
+
+  // Every agent that starts gets a row in the Runs view.
+  on('agent.spawn', async ($, e, next) => {
+    const started = await next(e)
+    if (!started.deny && started.agentId && !e.resume) await onSpawned($, started.agentId, e.subagentType, e.description, started.model)
+
+    return started
+  })
+
+  on('tool.call', { tool: `mcp__deckhand__${PROGRESS_TOOL.name}` }, async ($, e) => ({ result: await onProgress($, e.agentId, e as unknown as Record<string, unknown>) }))
 
   // The person's own prompt starts a loop when a Repeat chip is picked.
   on('prompt.submit', async ($, e, next) => {
@@ -59,7 +75,12 @@ export const register: Register = (on, options) => {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (e.agentId === undefined) await onMainTurnEnd($, e.reason)
+    if (e.agentId === undefined) {
+      await onMainTurnEnd($, e.reason)
+      await closeSwarm($, prompt)
+    } else {
+      await onAgentEnd($, e.agentId, e.reason)
+    }
 
     return done
   })
@@ -74,7 +95,12 @@ export const register: Register = (on, options) => {
 
   // Model and effort for the main loop only; subagents keep their own.
   on('turn.step', async function* ($, e, next) {
-    const now = e.agentId === undefined ? await current($) : undefined
+    if (e.agentId !== undefined) {
+      const step = yield* next(e)
+      if (step.usage) await onStep($, e.agentId, step.usage, step.usage.model)
+      return step
+    }
+    const now = await current($)
     if (!now) return yield* next(e)
     const route = routeOf(now.chips.model)
     // Local and Codex: Deckhand answers the turn itself, in text, with no tool calls.

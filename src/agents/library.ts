@@ -5,11 +5,13 @@ import type { EngineInterface } from 'claude-code'
 import type { Agent, DeckAgent } from '../../types'
 import { toolLists } from '../limits'
 import { parseAgent, serializeAgent } from './format'
+import { BUILTINS } from './starters'
 
 export const AGENTS_DIR = '.claude/agents'
 export const ICONS_DIR = '.claude/deckhand/icons'
 const LIBRARY = 'library'
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
+const enabledPlugins = atom({ plugin: 'deckhand', key: 'enabledPlugins' } as const, [] as string[])
 
 export function agentPath(name: string): string {
   return `${AGENTS_DIR}/${name}.md`
@@ -20,7 +22,8 @@ export async function readLibrary($: EngineInterface): Promise<Record<string, st
   return typeof library === 'object' && library !== null ? (library as Record<string, string>) : {}
 }
 
-// Project files first; library agents with no project file after them.
+// Project files first, then library agents, then built-ins, each skipped when
+// a card of its name is already there.
 export async function loadDeck($: EngineInterface): Promise<DeckAgent[]> {
   const library = await readLibrary($)
   const entries = await $.fs.list(AGENTS_DIR).catch(() => [])
@@ -32,11 +35,21 @@ export async function loadDeck($: EngineInterface): Promise<DeckAgent[]> {
     if (typeof text !== 'string') continue
     const { agent } = parseAgent(text)
     if (agent.name === '') agent.name = file.slice(0, -3)
-    deck.push({ agent, source: 'project', isInLibrary: library[agent.name] !== undefined, text })
+    deck.push({ agent, source: 'project', isInLibrary: library[agent.name] !== undefined, text, agentType: agent.name })
   }
   for (const [name, text] of Object.entries(library)) {
     if (deck.some(d => d.agent.name === name)) continue
-    deck.push({ agent: parseAgent(text).agent, source: 'library', isInLibrary: true, text })
+    deck.push({ agent: parseAgent(text).agent, source: 'library', isInLibrary: true, text, agentType: `deckhand:${name}` })
+  }
+  for (const b of BUILTINS) {
+    const known = deck.find(d => d.agent.name === b.id)
+    if (known) {
+      known.group ??= b.group
+      known.hat ??= b.hat
+      continue
+    }
+    const agent = { ...b.agent, name: b.id }
+    deck.push({ agent, source: 'builtin', isInLibrary: false, text: agentText(agent), group: b.group, hat: b.hat, agentType: `deckhand:${b.id}` })
   }
   for (const card of deck) {
     const icon = card.agent.icon
@@ -97,14 +110,19 @@ export async function registerAgent($: EngineInterface, agent: Agent): Promise<v
     ...(lists.disallowedTools?.length ? { disallowedTools: lists.disallowedTools } : {}),
     ...(agent.model && agent.gateway === null ? { model: agent.model } : {}),
     ...(agent.effort ? { effort: agent.effort } : {}),
+    ...(agent.skills?.length ? { skills: agent.skills } : {}),
   })
 }
 
-// Reloads the deck into state and registers the library-only agents.
+// Reloads the deck into state and registers the agents Claude Code does not
+// load from files itself: library and built-in ones.
 export async function refreshDeck($: EngineInterface): Promise<DeckAgent[]> {
   const cards = await loadDeck($)
   await update($, deck, () => cards)
-  for (const card of cards.filter(c => c.source === 'library')) {
+  const plugins = await $.settings.read({ key: 'enabledPlugins' }).catch(() => undefined)
+  const on = typeof plugins === 'object' && plugins !== null ? Object.entries(plugins).filter(([, v]) => v === true).map(([k]) => k) : []
+  await update($, enabledPlugins, () => on)
+  for (const card of cards.filter(c => c.source !== 'project')) {
     await registerAgent($, card.agent).catch(() => undefined)
   }
 

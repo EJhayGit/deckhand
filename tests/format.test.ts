@@ -95,7 +95,28 @@ test('a new agent serializes and parses back', () => {
     expect(back.limits).toEqual(agent.limits)
     expect(back.body).toBe(agent.body)
     expect(back.description).toBe(agent.description)
+    expect(back.skills).toEqual(agent.skills)
+    expect(back.plugins).toEqual(agent.plugins)
   }
+})
+
+test('skills and plugins round-trip, and a hand-written list survives a save', () => {
+  const hand = `---
+name: designer
+skills:
+  - taste-skill:design-taste-frontend
+deckhand:
+  plugins: ["taste-skill@taste-skill"]   # mine
+---
+Body
+`
+  const doc = parseAgent(hand)
+
+  expect(doc.agent.skills).toEqual(['taste-skill:design-taste-frontend'])
+  expect(doc.agent.plugins).toEqual(['taste-skill@taste-skill'])
+  expect(serializeAgent(doc.agent, doc)).toBe(hand)
+  const more = serializeAgent({ ...doc.agent, plugins: ['taste-skill@taste-skill', 'fp-check@trailofbits'] }, doc)
+  expect(parseAgent(more).agent.plugins).toEqual(['taste-skill@taste-skill', 'fp-check@trailofbits'])
 })
 
 test('a plain Claude Code agent file with no deckhand block reads as read only', () => {
