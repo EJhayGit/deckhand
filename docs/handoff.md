@@ -13,7 +13,7 @@
 - `launch/` holds a landing page with a one-page launch plan and three SVG
   graphics, made by the first live Launch kit swarm.
 - Checks pass: `claude plugin validate .`, `tsc` (with the bundled types),
-  `claude plugin test .` (85 tests).
+  `claude plugin test .` (86 tests).
 - Live testing of unmerged changes runs from the session's dev-mod copy in
   `~/.claude/dev-mods/<session>/deckhand/` (hooks, src, types and
   plugin.json copied from this repo), with the marketplace deckhand turned
@@ -24,17 +24,15 @@
   `.claude/agents/` has reviewer, test-writer, debugger and docs-writer (these
   Deckhand-dev helpers were left as they are; the project reviewer replaces
   the built-in one in this repo's deck).
-
-- 0.2.1 is in the working tree on `main`, uncommitted: swarm-lead names
-  agents as `deckhand:<id>` (bare names failed with "Agent type not found"),
-  model chips read Haiku 5.5 / Sonnet 5.5 / Opus 5.5 / Fable 5.1 (ids stay
-  aliases), and the status line is cleared instead of set. 86 tests pass.
+- 0.2.1 is merged (PR #9, 2026-10-28), not tagged: swarm-lead names agents
+  as `deckhand:<id>` (bare names failed with "Agent type not found"), model
+  chips read Haiku 5.5 / Sonnet 5.5 / Opus 5.5 / Fable 5.1 (ids stay
+  aliases), and the status line is cleared instead of set.
 
 ## Next step
 
-- Owner: say when to commit 0.2.1 (it needs a branch and PR; `main` is the
-  base).
-
+- Owner: `/plugin update`, restart, and run a task with swarm-lead in use;
+  check that it starts deck agents and they show in Runs.
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.
   Then try Set up on frontend-designer and restart.
 - Before launch (from the swarm's review): take real screenshots, and export
