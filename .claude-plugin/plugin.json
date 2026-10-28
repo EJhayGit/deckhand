@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "types": "./types/index.d.ts",
   "author": { "name": "EJhayGit" },
+  "license": "MIT",
   "description": "A deck of reusable agents beside the chat, with chips for model, effort, limits and repeat.",
   "userConfig": {
     "localUrl": {

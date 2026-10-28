@@ -2,9 +2,10 @@
 
 ## State
 
-- 0.2.0 is on `main`: PR #6 merged 2026-10-28, not tagged yet (only
-  `v0.1.0` exists). The marketplace install reads `main`, so it gives 0.2.0
-  after `/plugin update`. It has 16 built-in agents,
+- 0.2.0 is released: PR #6 merged 2026-10-28, tagged `v0.2.0` with a GitHub
+  release, MIT licensed (`LICENSE`, `"license": "MIT"` in plugin.json). The
+  marketplace install reads `main`, so it gives 0.2.0 after `/plugin update`.
+  It has 16 built-in agents,
   plugin Set up, the new deck look, the Runs tab, optional swarms (Parallel
   goes through the chat) and `/deck swarm`. See `PLAN.md` section 12 and
   `docs/decisions/0004-agent-catalog-and-plugin-setup.md`,
@@ -28,8 +29,8 @@
 
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.
   Then try Set up on frontend-designer and restart.
-- Before launch (from the swarm's review): add a LICENSE, tag v0.2.0, take
-  real screenshots, and export the OG card as a PNG.
+- Before launch (from the swarm's review): take real screenshots, and export
+  the OG card as a PNG.
 
 ## Open items
 
@@ -45,4 +46,6 @@
   90 KB. Move it out if that matters.
 - README has no screenshots: they need a live session.
 - PNG/JPG icons are wrapped in an SVG `<image>`; unverified on desktop.
-- `claude plugin validate .` flags a missing LICENSE and icon.
+- `claude plugin validate .` warns that the plugin has no icon (a square PNG
+  at `.claude-plugin/icon.png`). That only matters for the official plugin
+  directory; `launch/graphics/icon.svg` could be exported for it.

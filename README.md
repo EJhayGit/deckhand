@@ -170,3 +170,7 @@ claude plugin test .
 
 `tsc -p .` needs the API types Claude Code writes into `.claude-plugin/types/`
 the first time it loads the mod (see `docs/decisions/0001-hooks-import-and-turn-cancel.md`).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
