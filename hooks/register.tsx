@@ -2,6 +2,7 @@ import { atom, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import { refreshDeck } from '../src/agents/library'
+import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
 import { routeOf } from '../src/models'
@@ -14,6 +15,7 @@ const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as stri
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    await $.command.register(COMMAND)
     await clearLoop($)
     await refreshDeck($)
     await showStatus($)
@@ -21,6 +23,8 @@ export const register: Register = on => {
 
     return started
   })
+
+  on('command.run', { command: 'deck' }, async ($, e) => ({ text: await runDeck($, e.args) }))
 
   on('ui.render', { component: 'Pane', requestId: DECK.id }, ($, e) => renderDeck($, e))
 
