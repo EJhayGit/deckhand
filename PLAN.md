@@ -288,7 +288,25 @@ Local models vary a lot in tool use, so show a one-line hint on Local agents.
   between cards and a drop zone.
 - **More repeat modes:** "until tests pass", up to 3 tries.
 
-## 12. Working rules for the building agent
+## 12. v0.2: built-in agents, Runs and swarms
+
+Built on branch `build-v2` after 0.1.0. Details and reasons are in
+`docs/decisions/0004-agent-catalog-and-plugin-setup.md` and
+`0005-swarms-and-runs-view.md`.
+
+- **Built-in agents:** 16 in five groups (Core, Design, Security, Web, Lead),
+  shown in every deck; a project or library agent of the same name wins.
+  Hidden from the model unless swarm-lead is in use.
+- **Plugins and skills:** `skills` and `deckhand.plugins` in the agent file.
+  Set up writes project `.claude/settings.json` only, after a confirm.
+- **Look:** tabs Deck, Runs, Swarm; pixel mascots; a weight word from effort
+  (light, medium, careful, heavy); XHigh effort chip.
+- **Runs:** a row per started agent with steps, ctx, tokens, estimated cost,
+  time and a bar; Cost, Tokens and Time totals. No cost cap.
+- **Swarms (optional):** Parallel (presets or custom) and Lead (swarm-lead,
+  which allows everything so its workers keep their own limits).
+
+## 13. Working rules for the building agent
 
 - Read `CLAUDE.md`, this plan and `docs/handoff.md` at the start of every
   session. Update `docs/handoff.md` before ending one.

@@ -1,6 +1,6 @@
 {
   "name": "deckhand",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "types": "./types/index.d.ts",
   "author": { "name": "EJhayGit" },
   "description": "A deck of reusable agents beside the chat, with chips for model, effort, limits and repeat.",

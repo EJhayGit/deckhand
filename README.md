@@ -22,19 +22,59 @@ A **Deck** panel opens beside the chat.
 
 ## Use it
 
-1. In the Deck panel, click **+ New**. Type a name, pick a starter (Reviewer,
-   Bug fixer, Docs writer, Test runner or Blank), and click **Save**. The agent
-   is saved to `.claude/agents/<name>.md`, so plain Claude Code can use it too.
+1. The Deck already holds 16 ready agents (see below). To make your own, click
+   **+ New**, type a name, pick what it starts from, and click **Save**. The
+   agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
+   it too.
 2. Click **Use** on a card. A chip band appears above the prompt, and the
    status line shows the agent, model, effort and what it may do.
 3. Type your task as usual. The agent's instructions, model and effort apply
    to the chat, and its limits apply to every tool call.
 4. Click **None** (or `/deck none`) to go back to plain Claude Code.
 
+### Built-in agents
+
+| Group | Agents |
+| --- | --- |
+| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer |
+| Design | frontend-designer, ui-critic, graphics-designer |
+| Security | security-auditor, dependency-auditor, change-security-review |
+| Web | website-reviewer (give it a URL) |
+| Lead | swarm-lead |
+
+Click a group's name to fold it. A file in `.claude/agents/` with the same
+name replaces the built-in card.
+
+Some agents work best with a plugin: frontend-designer and ui-critic use
+[taste-skill](https://github.com/Leonxlnx/taste-skill), the security agents use
+[Trail of Bits skills](https://github.com/trailofbits/skills), website-reviewer
+uses Playwright or Chrome DevTools. Their cards say **needs …**. Click
+**Set up**, then **Add**: Deckhand adds the plugins to this project's
+`.claude/settings.json`, and Claude Code offers to install them when you
+restart it. Nothing global is changed.
+
+### Swarms (optional)
+
+Open the **Swarm** tab to run several agents on one task:
+
+- **Parallel:** pick a preset (Launch kit, Security sweep, Ship check) or tick
+  agents, type the task, click **Start**. Each agent works on its own part in
+  the background.
+- **Lead:** swarm-lead takes the task in the chat, splits it, and hands parts
+  to the deck's agents.
+
+Or type `/deck swarm launch-kit <task>` or `/deck swarm lead <task>`.
+
+### Runs
+
+The **Runs** tab shows every agent this session started, from a swarm or from
+Claude: its model and effort, steps, context use, tokens, estimated cost, time
+and a progress bar, with totals on top. Cost is an estimate from list prices.
+
 ### The chip band
 
 - **Model:** Default, Haiku, Sonnet, Opus, Codex, Local.
-- **Effort:** Low, Medium, High, Max.
+- **Effort:** Low, Medium, High, XHigh, Max.
 - **Can:** Edit files, Run commands, Internet. A new agent starts with all
   three off (read only). A blocked call shows a toast and a note in the chat,
   for example: "Blocked: reviewer tried to run `npm install`, but Run commands
@@ -61,6 +101,7 @@ library, and Delete (asks first). Library agents show in every project; use
 | `/deck repeat 3` / `10m` / `30m` / `60m` | Repeats your next prompt |
 | `/deck repeat stop` | Stops a loop |
 | `/deck limits` | Shows what the active agent may do |
+| `/deck swarm <launch-kit\|security-sweep\|ship-check\|lead> <task>` | Starts a swarm |
 
 ### Local models and Codex
 
@@ -99,6 +140,10 @@ deckhand:
 ---
 Fix the bug I describe with the smallest change.
 ```
+
+Two optional keys: `skills: [<plugin>:<skill>, ...]` preloads skills into the
+agent, and `plugins: [<plugin>@<marketplace>, ...]` under `deckhand:` lists the
+plugins its Set up button adds.
 
 Keys Deckhand doesn't know, comments, and the body are kept as written when it
 saves.
