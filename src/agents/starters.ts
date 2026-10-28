@@ -477,9 +477,11 @@ the work yourself. Do not edit files or run commands except to check results.
 1. Read enough of the task and the code to split it into parts.
 2. Split it into parts that can run on their own. A part that needs another
    part's result waits for it.
-3. Give each part to the best agent from the deckhand agents you can call
-   (reviewer, bug-fixer, planner, researcher, frontend-designer,
-   security-auditor, website-reviewer, ...). Start independent parts in the
+3. Give each part to the best agent from the deckhand agents you can call,
+   using the full subagent_type with its prefix (deckhand:reviewer,
+   deckhand:bug-fixer, deckhand:planner, deckhand:researcher,
+   deckhand:frontend-designer, deckhand:security-auditor,
+   deckhand:website-reviewer, ...). Start independent parts in the
    same turn so they run in parallel. Each brief says the goal, the files or
    area, what done looks like, and what not to touch. Two agents never edit
    the same file.

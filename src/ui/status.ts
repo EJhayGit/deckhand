@@ -1,13 +1,14 @@
-// Labels for chips and the status line. Pure: no `$`.
-import type { Agent, Chips, Effort, Loop } from '../../types'
-import { badges } from '../limits'
+// Labels for chips and cards. Pure: no `$`.
+import type { Agent, Effort } from '../../types'
 import { CLAUDE_IDS, modelName } from '../models'
 
+// Ids stay aliases so saved agents keep working; labels show the version.
 export const MODEL_CHIPS = [
   { id: undefined, label: 'Default' },
-  { id: 'haiku', label: 'Haiku' },
-  { id: 'sonnet', label: 'Sonnet' },
-  { id: 'opus', label: 'Opus' },
+  { id: 'haiku', label: modelName('haiku') },
+  { id: 'sonnet', label: modelName('sonnet') },
+  { id: 'opus', label: modelName('opus') },
+  { id: 'fable', label: modelName('fable') },
   { id: 'codex', label: 'Codex' },
   { id: 'local', label: 'Local' },
 ] as const
@@ -63,23 +64,4 @@ export function iconText(agent: Agent): string {
   if (icon && !icon.endsWith('.svg')) return icon
 
   return (agent.name[0] ?? '?').toUpperCase()
-}
-
-export function loopText(loop: Loop | null): string | undefined {
-  if (!loop) return undefined
-  if (loop.mode === 'x3') return `loop ${loop.run} of 3`
-
-  return `loop ${loop.run}, every ${loop.mode.slice(1)} min`
-}
-
-export function statusText(agent: Agent, chips: Chips, loop: Loop | null): string {
-  const parts = [
-    `${iconText(agent)} ${agent.name}`,
-    modelLabel(chips.model),
-    chips.effort ? `${chips.effort} effort` : undefined,
-    badges(chips.limits).join(', '),
-    loopText(loop),
-  ]
-
-  return parts.filter(p => p !== undefined).join(' · ')
 }

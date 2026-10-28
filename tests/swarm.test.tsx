@@ -1,7 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parallelPrompt } from '../src/swarm'
-import { PANE, START, turnEnds, world } from './world'
+import { STARTERS } from '../src/agents/starters'
+import { BAND, PANE, START, turnEnds, world } from './world'
 
 const OFFER = { agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never
 
@@ -61,6 +62,17 @@ test('Custom picks ask only for the picked agents, a project one by its file nam
   await ui.unmount()
 })
 
+test("every agent swarm-lead names is a registered agent type, with its prefix", async ($, on) => {
+  const w = world(on)
+  await $.session.start(START)
+  const body = STARTERS.find(s => s.id === 'swarm-lead')!.agent.body
+  const named = [...body.matchAll(/deckhand:([\w-]+)/g)].map(m => m[0])
+  const registered = w.agents.map(a => `deckhand:${a.name}`)
+
+  expect(named.length).toBeGreaterThan(0)
+  for (const type of named) expect(registered).toContain(type)
+})
+
 test('Lead makes swarm-lead active and sends the task to the chat', async ($, on) => {
   const w = world(on)
   mock.clock(on)
@@ -73,7 +85,9 @@ test('Lead makes swarm-lead active and sends the task to the chat', async ($, on
   await ui.press({ key: 'swarm-start' })
 
   expect(w.submitted).toEqual(['Ship the launch kit'])
-  expect(w.status.at(-1)).toContain('swarm-lead')
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await band.find({ type: 'Text', text: /swarm-lead/ })).toBeDefined()
+  await band.unmount()
   // While the lead is in use, the built-ins are offered to the model.
   expect(await $.agent.offer(OFFER)).not.toEqual({ isOffered: false })
   await ui.unmount()

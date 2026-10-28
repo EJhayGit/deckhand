@@ -49,16 +49,16 @@ test('3× resends the prompt after each turn and stops after the third', async (
   const band = await setup($, 'x3')
 
   await $.prompt.submit(personSays('review src'))
-  expect(w.status.at(-1)).toContain('loop 1 of 3')
+  expect(await band.find({ key: 'stop' })).toBeDefined()
   await $.turn.complete(turnEnds())
-  expect(w.status.at(-1)).toContain('loop 2 of 3')
+  expect(w.submitted).toEqual(['review src', 'review src'])
+  expect(await band.find({ key: 'stop' })).toBeDefined()
   await $.turn.complete(turnEnds())
   await $.turn.complete(turnEnds())
   await $.turn.complete(turnEnds())
 
   expect(w.submitted).toEqual(['review src', 'review src', 'review src'])
   expect(w.toasts.at(-1)).toBe('Loop done.')
-  expect(w.status.at(-1)).not.toContain('loop')
   expect(await band.find({ key: 'stop' })).toBeUndefined()
   await band.unmount()
 })
@@ -80,7 +80,8 @@ test('a timer resends every 10 minutes after the turn ends, and only then', asyn
   expect(w.submitted).toEqual(['check CI', 'check CI'])
   await clock.advance(60 * 60_000)
   expect(w.submitted).toEqual(['check CI', 'check CI'])
-  expect(w.status.at(-1)).toContain('loop 2, every 10 min')
+  // Still looping: the second turn hasn't ended, so Stop stays.
+  expect(await band.find({ key: 'stop' })).toBeDefined()
   await band.unmount()
 })
 

@@ -25,7 +25,15 @@
   Deckhand-dev helpers were left as they are; the project reviewer replaces
   the built-in one in this repo's deck).
 
+- 0.2.1 is in the working tree on `main`, uncommitted: swarm-lead names
+  agents as `deckhand:<id>` (bare names failed with "Agent type not found"),
+  model chips read Haiku 5.5 / Sonnet 5.5 / Opus 5.5 / Fable 5.1 (ids stay
+  aliases), and the status line is cleared instead of set. 86 tests pass.
+
 ## Next step
+
+- Owner: say when to commit 0.2.1 (it needs a branch and PR; `main` is the
+  base).
 
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.
   Then try Set up on frontend-designer and restart.

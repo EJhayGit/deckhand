@@ -2,13 +2,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { Agent, Chips, DeckAgent, Loop } from '../types'
-import { statusText } from './ui/status'
+import type { Agent, Chips, DeckAgent } from '../types'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
 const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as string | null)
 const chips = atom({ plugin: 'deckhand', key: 'chips' } as const, null as Chips | null)
-const loop = atom({ plugin: 'deckhand', key: 'loop' } as const, null as Loop | null)
 const swarmOpen = atom({ plugin: 'deckhand', key: 'swarmOpen' } as const, null as string | null)
 
 export function chipsOf(agent: Agent): Chips {
@@ -48,7 +46,7 @@ export async function isHiddenAgent($: EngineInterface, agentType: string): Prom
   return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead' && (await read($, swarmOpen)) === null
 }
 
+// The band already shows the agent, so the status line stays clear.
 export async function showStatus($: EngineInterface): Promise<void> {
-  const now = await current($)
-  $.ui.status(now ? statusText(now.card.agent, now.chips, await read($, loop)) : undefined)
+  $.ui.status(undefined)
 }

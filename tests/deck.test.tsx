@@ -54,13 +54,13 @@ test('cards show, and Use marks the active card, on terminal and desktop', async
     await ui.press({ key: 'use-reviewer' })
     expect((await ui.find({ key: 'use-reviewer' }))?.text).toBe('In use')
     expect((await ui.find({ key: 'use-fixer' }))?.text).toBe('Use')
-    expect(w.status.at(-1)).toBe('🔍 reviewer · Haiku · read only')
 
     await ui.press({ key: 'none' })
     expect((await ui.find({ key: 'use-reviewer' }))?.text).toBe('Use')
-    expect(w.status.at(-1)).toBe(undefined)
+    expect((await ui.find({ key: 'use-fixer' }))?.text).toBe('Use')
     await ui.unmount()
   }
+  expect(w.status.every(s => s === undefined)).toBe(true)
 })
 
 test('Duplicate writes a copy, and Delete asks first', async ($, on) => {

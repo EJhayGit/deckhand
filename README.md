@@ -26,8 +26,8 @@ A **Deck** panel opens beside the chat.
    **+ New**, type a name, pick what it starts from, and click **Save**. The
    agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
    it too.
-2. Click **Use** on a card. A chip band appears above the prompt, and the
-   status line shows the agent, model, effort and what it may do.
+2. Click **Use** on a card. A chip band appears above the prompt showing the
+   agent, model, effort and what it may do.
 3. Type your task as usual. The agent's instructions, model and effort apply
    to the chat, and its limits apply to every tool call.
 4. Click **None** (or `/deck none`) to go back to plain Claude Code.
@@ -77,7 +77,9 @@ and a progress bar, with totals on top. Cost is an estimate from list prices.
 
 ### The chip band
 
-- **Model:** Default, Haiku, Sonnet, Opus, Codex, Local.
+- **Model:** Default, Haiku 5.5, Sonnet 5.5, Opus 5.5, Fable 5.1, Codex, Local.
+  An agent file can name any of them by alias (`haiku`, `sonnet`, `opus`,
+  `fable`), which always means the latest version.
 - **Effort:** Low, Medium, High, XHigh, Max.
 - **Can:** Edit files, Run commands, Internet. A new agent starts with all
   three off (read only). A blocked call shows a toast and a note in the chat,
