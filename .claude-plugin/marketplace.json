@@ -1,0 +1,5 @@
+{
+  "name": "deckhand",
+  "owner": { "name": "EJhayGit" },
+  "plugins": [{ "name": "deckhand", "source": "./" }]
+}

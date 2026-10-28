@@ -1,0 +1,6 @@
+{
+  "name": "deckhand",
+  "version": "0.1.0",
+  "author": { "name": "EJhayGit" },
+  "description": "A deck of reusable agents beside the chat, with chips for model, effort, limits and repeat."
+}
