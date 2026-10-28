@@ -1,20 +1,36 @@
-# Project starter
+# Deckhand
 
-A lightweight starting point for a software project. It contains guidance and planning documents, with no application code or stack-specific dependencies.
+A Claude Code mod: a deck of reusable agents beside the chat, with clickable
+chips for model, effort, limits and repeat.
 
-## Start a project
+## Install
 
-Copy this directory to a new project location, then rename the copy for your application. For example, in PowerShell:
+At the prompt of a Claude Code terminal session:
 
-```powershell
-Copy-Item -Path "C:\Development\Templates\project-starter" -Destination "C:\Development\MyApp" -Recurse
+```
+/plugin install deckhand --marketplace EJhayGit/deckhand
 ```
 
-In the new directory, fill in the relevant sections of `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, and `docs/TESTING.md` as decisions are made. Replace this README with a project overview and setup instructions once the application exists. Keep `AGENTS.md` for project-level guidance and add only conventions the project actually adopts.
+Answer `y` to add the marketplace, then pick a scope (user scope is first).
 
-## Contents
+In the desktop app, where `/plugin` doesn't run: click **+** next to the prompt
+box, then **Plugins**, **Add marketplace** with `EJhayGit/deckhand`, then
+**Add plugin**.
 
-- `AGENTS.md`: project-level agent guidance.
-- `docs/REQUIREMENTS.md`: goals, scope, and acceptance criteria.
-- `docs/ARCHITECTURE.md`: technical structure and decisions.
-- `docs/TESTING.md`: verification approach and commands.
+A **Deck** panel opens beside the chat.
+
+## Develop
+
+Run it from this folder for one session:
+
+```
+claude --plugin-dir .
+```
+
+Checks:
+
+```
+claude plugin validate .
+tsc -p .
+claude plugin test .
+```

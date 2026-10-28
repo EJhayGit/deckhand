@@ -22,3 +22,6 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Types Claude Code lays for the mod on load
+.claude-plugin/types/
