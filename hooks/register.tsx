@@ -3,6 +3,7 @@ import type { Register } from 'claude-code'
 
 import { refreshDeck } from '../src/agents/library'
 import { blockedNote, blockingLimit } from '../src/limits'
+import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, showStatus } from '../src/session'
 import { renderBand } from '../src/ui/band'
@@ -13,6 +14,7 @@ const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as stri
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    await clearLoop($)
     await refreshDeck($)
     await showStatus($)
     void $.ui.open(DECK)
@@ -23,7 +25,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: DECK.id }, ($, e) => renderDeck($, e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const band = e.props.hasSurvey ? undefined : await renderBand($, e, async () => undefined)
+    const band = e.props.hasSurvey ? undefined : await renderBand($, e, () => stopLoop($))
     return band ?? next(e)
   })
 
@@ -35,6 +37,21 @@ export const register: Register = on => {
     const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}`
 
     return { sections: [...composed.sections, { id: 'deckhand:agent', text, scope: 'session' as const }] }
+  })
+
+  // The person's own prompt starts a loop when a Repeat chip is picked.
+  on('prompt.submit', async ($, e, next) => {
+    const sent = await next(e)
+    if (e.origin.kind === 'composer' && !('drop' in sent && sent.drop)) await onPersonPrompt($, e.text)
+
+    return sent
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const done = await next(e)
+    if (e.agentId === undefined) await onMainTurnEnd($, e.reason)
+
+    return done
   })
 
   on('turn.start', async ($, e, next) => {

@@ -81,6 +81,8 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     return { value: undefined }
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
 
   return w
 }
@@ -128,3 +130,14 @@ export const START = { cwd: '/', surface: 'desktop', isInteractive: true } as co
 
 export const agentFile = (name: string, limits = '{ edit: false, run: false, internet: false }', model = 'haiku') =>
   `---\nname: ${name}\ndescription: The ${name}.\nmodel: ${model}\ndeckhand:\n  icon: "🔍"\n  limits: ${limits}\n---\nDo ${name} things.\n`
+
+export const personSays = (text: string) => ({ text, wait: false, origin: { kind: 'composer' as const } })
+
+export const turnEnds = (reason: 'answer' | 'aborted' | 'error' = 'answer', agentId?: string) => ({
+  answer: 'ok',
+  durationMs: 1,
+  isAborted: reason === 'aborted',
+  turnId: 't',
+  reason,
+  ...(agentId ? { agentId } : {}),
+})
