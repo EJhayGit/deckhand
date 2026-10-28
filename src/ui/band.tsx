@@ -1,6 +1,6 @@
 // The chip band above the prompt, shown while an agent is active.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, RenderInput } from 'claude-code'
+import type { EngineInterface, RenderChildren, RenderInput } from 'claude-code'
 
 import type { Chips, Limits, Loop, RepeatMode } from '../../types'
 import { agentText, refreshDeck, saveToLibrary, writeAgent } from '../agents/library'
@@ -36,24 +36,25 @@ export async function renderBand($: EngineInterface, e: RenderInput, onStop: () 
     <Button key={key} label={label} variant={isOn ? 'primary' : 'secondary'} dimColor={!isOn} onPress={() => void press()} />
   )
 
+  // A fixed label column keeps every row's chips lined up.
+  const row = (label: string, children: RenderChildren[]) => (
+    <Box flexDirection="row" columnGap={1}>
+      <Box width={8} flexShrink={0}><Text dimColor>{label}</Text></Box>
+      <Box flexDirection="row" gap="xs" flexWrap="wrap" flexShrink={1}>{children}</Box>
+    </Box>
+  )
+
   return (
-    <Box flexDirection="column">
-      <Box flexDirection="row" gap={1} flexWrap="wrap">
+    <Box flexDirection="column" rowGap="xs" paddingX={1}>
+      <Box flexDirection="row" columnGap={1}>
         <Text bold>{iconText(agent)} {agent.name}</Text>
-        {MODEL_CHIPS.map(m => chip(`model-${m.id ?? 'default'}`, m.label, on.model === m.id || (m.id === 'local' && on.model?.startsWith('local:') === true), () => setChips($, { model: m.id })))}
-      </Box>
-      <Box flexDirection="row" gap={1} flexWrap="wrap">
-        <Text dimColor>Effort</Text>
-        {EFFORT_CHIPS.map(f => chip(`effort-${f.id}`, f.label, on.effort === f.id, () => setChips($, { effort: on.effort === f.id ? undefined : f.id })))}
-        <Text dimColor>Can</Text>
-        {(Object.keys(LIMIT_LABEL) as Limit[]).map(l => chip(`can-${l}`, LIMIT_LABEL[l], on.limits[l], () => setChips($, { limits: { ...on.limits, [l]: !on.limits[l] } as Limits })))}
-      </Box>
-      <Box flexDirection="row" gap={1} flexWrap="wrap">
-        <Text dimColor>Repeat</Text>
-        {REPEAT_CHIPS.map(r => chip(`repeat-${r.id}`, r.label, mode === r.id, () => update($, repeat, () => r.id)))}
         {running && <Button key="stop" label="Stop" onPress={() => void onStop()} />}
         {isChanged && <Button key="save-chips" label="Save to agent" onPress={() => saveChips($)} />}
       </Box>
+      {row('Model', MODEL_CHIPS.map(m => chip(`model-${m.id ?? 'default'}`, m.label, on.model === m.id || (m.id === 'local' && on.model?.startsWith('local:') === true), () => setChips($, { model: m.id }))))}
+      {row('Effort', EFFORT_CHIPS.map(f => chip(`effort-${f.id}`, f.label, on.effort === f.id, () => setChips($, { effort: on.effort === f.id ? undefined : f.id }))))}
+      {row('Can', (Object.keys(LIMIT_LABEL) as Limit[]).map(l => chip(`can-${l}`, LIMIT_LABEL[l], on.limits[l], () => setChips($, { limits: { ...on.limits, [l]: !on.limits[l] } as Limits }))))}
+      {row('Repeat', REPEAT_CHIPS.map(r => chip(`repeat-${r.id}`, r.label, mode === r.id, () => update($, repeat, () => r.id))))}
       {routeOf(on.model).kind === 'local' && <Text dimColor>{LOCAL_HINT}</Text>}
       {routeOf(on.model).kind === 'codex' && <Text dimColor>{CODEX_HINT}</Text>}
     </Box>

@@ -31,6 +31,11 @@
 
 ## Next step
 
+- Branch `band-layout` (unmerged): the chip band now has one row per
+  label (Model, Effort, Can, Repeat) with a fixed label column, gaps between
+  chips and rows, and Stop / Save to agent beside the agent name. Owner:
+  check it live from the dev-mod copy, then merge.
+
 - Owner: `/plugin update`, restart, and run a task with swarm-lead in use;
   check that it starts deck agents and they show in Runs.
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.
