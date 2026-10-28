@@ -290,7 +290,7 @@ Local models vary a lot in tool use, so show a one-line hint on Local agents.
 
 ## 12. v0.2: built-in agents, Runs and swarms
 
-Built on branch `build-v2` after 0.1.0. Details and reasons are in
+Built on branch `build-v2` after 0.1.0 and merged as PR #6. Details and reasons are in
 `docs/decisions/0004-agent-catalog-and-plugin-setup.md` and
 `0005-swarms-and-runs-view.md`.
 

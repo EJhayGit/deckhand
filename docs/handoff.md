@@ -2,9 +2,9 @@
 
 ## State
 
-- 0.1.0 is released on `main` (tag `v0.1.0`). It's what the marketplace
-  install gives until 0.2 is merged.
-- 0.2.0 is on branch `build-v2`, PR #6 open, not merged: 16 built-in agents,
+- 0.2.0 is on `main`: PR #6 merged 2026-10-28, not tagged yet (only
+  `v0.1.0` exists). The marketplace install reads `main`, so it gives 0.2.0
+  after `/plugin update`. It has 16 built-in agents,
   plugin Set up, the new deck look, the Runs tab, optional swarms (Parallel
   goes through the chat) and `/deck swarm`. See `PLAN.md` section 12 and
   `docs/decisions/0004-agent-catalog-and-plugin-setup.md`,
@@ -13,10 +13,11 @@
   graphics, made by the first live Launch kit swarm.
 - Checks pass: `claude plugin validate .`, `tsc` (with the bundled types),
   `claude plugin test .` (85 tests).
-- Live testing runs from the session's dev-mod copy in
+- Live testing of unmerged changes runs from the session's dev-mod copy in
   `~/.claude/dev-mods/<session>/deckhand/` (hooks, src, types and
-  plugin.json copied from this repo), with the marketplace deckhand 0.1.0
-  turned off. Copy again after each change.
+  plugin.json copied from this repo), with the marketplace deckhand turned
+  off. Copy again after each change. With 0.2 merged, the marketplace
+  install can be turned back on and updated instead.
 - The repo ships project Claude Code setup: `.claude/settings.json` turns on
   plugins from the official and `anthropics/skills` marketplaces, and
   `.claude/agents/` has reviewer, test-writer, debugger and docs-writer (these
@@ -27,8 +28,8 @@
 
 - Owner: run one more swarm and check that steps like `2/4` show in Runs.
   Then try Set up on frontend-designer and restart.
-- Before launch (from the swarm's review): add a LICENSE, merge PR #6 and tag
-  v0.2.0, take real screenshots, and export the OG card as a PNG.
+- Before launch (from the swarm's review): add a LICENSE, tag v0.2.0, take
+  real screenshots, and export the OG card as a PNG.
 
 ## Open items
 
