@@ -8,8 +8,9 @@
 
 ## Next step
 
-- Owner: create the GitHub repo `EJhayGit/deckhand`, then push and open the M0 PR.
-- After M0 merges: M1 (agent files) on branch `m1-agent-files`.
+- M0 PR is open (EJhayGit/deckhand#1, public repo). Waiting for the owner to
+  try it and say merge.
+- After M0 merges: M1 (agent files) on branch `m1-agent-files` from updated main.
 
 ## Open items
 
