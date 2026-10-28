@@ -49,11 +49,17 @@ export async function loadDeck($: EngineInterface): Promise<DeckAgent[]> {
   return deck
 }
 
-// Writes the agent's project file, keeping what the old text held.
-export async function writeAgent($: EngineInterface, agent: Agent, oldText?: string): Promise<string> {
+// The agent's file text with its limits applied to its tool lists.
+export function agentText(agent: Agent, oldText?: string): string {
   const lists = toolLists(agent)
   const saved = { ...agent, tools: lists.tools, disallowedTools: lists.disallowedTools }
-  const text = serializeAgent(saved, oldText === undefined ? undefined : parseAgent(oldText))
+
+  return serializeAgent(saved, oldText === undefined ? undefined : parseAgent(oldText))
+}
+
+// Writes the agent's project file, keeping what the old text held.
+export async function writeAgent($: EngineInterface, agent: Agent, oldText?: string): Promise<string> {
+  const text = agentText(agent, oldText)
   await $.fs.write(agentPath(agent.name), text)
 
   return text

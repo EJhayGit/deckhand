@@ -106,3 +106,21 @@ export const PANE = {
 } as const
 
 export const SURFACES = ['terminal', 'desktop'] as const
+
+export const BAND = {
+  plugin: 'deckhand',
+  component: 'AbovePrompt',
+  props: {
+    hasSurvey: false,
+    isWorking: false,
+    maxRows: 10,
+    bodyColumns: 100,
+    scroll: { offset: 0, bodyRows: 10 },
+    view: {},
+  },
+} as const
+
+export const START = { cwd: '/', surface: 'desktop', isInteractive: true } as const
+
+export const agentFile = (name: string, limits = '{ edit: false, run: false, internet: false }', model = 'haiku') =>
+  `---\nname: ${name}\ndescription: The ${name}.\nmodel: ${model}\ndeckhand:\n  icon: "🔍"\n  limits: ${limits}\n---\nDo ${name} things.\n`
