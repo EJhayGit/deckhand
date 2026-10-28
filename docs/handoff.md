@@ -4,14 +4,20 @@
 
 - Deckhand 0.1.0 is released: PR #2 merged into `main` and tagged `v0.1.0`.
   Install with `/plugin install deckhand --marketplace EJhayGit/deckhand`.
-- Decisions: `docs/decisions/0001-hooks-import-and-turn-cancel.md` and
-  `0002-codex-and-local-models.md`.
+- Decisions: `docs/decisions/0001-hooks-import-and-turn-cancel.md`,
+  `0002-codex-and-local-models.md` and `0003-preinstalled-plugins-and-agents.md`.
+- The repo ships project Claude Code setup: `.claude/settings.json` turns on
+  plugins from the official and `anthropics/skills` marketplaces, and
+  `.claude/agents/` has reviewer, test-writer, debugger and docs-writer, which
+  also show in the Deckhand deck.
 
 ## Next step
 
 - Owner: install it and try it in a live session, then report what breaks.
 
 ## Open items
+
+- The preinstalled plugins haven't been installed in a live session yet.
 
 - Not tried in a live session yet. Everything is covered by
   `claude plugin test .`, which mocks the engine, files, Ollama and Codex.
