@@ -178,8 +178,10 @@ emoji or first letter.
 
 ## 7. Milestones
 
-Each milestone is one branch and one PR, merged before the next starts. Each
-ends with its tests passing, plus `claude plugin validate .` and `tsc -p .`.
+All milestones are built in order on one branch (`build-v1`) with one PR; the
+milestones are the build order only. Each ends with a commit, its tests
+passing, plus `claude plugin validate .` and `tsc -p .`. The builder doesn't
+stop to ask between milestones.
 
 | # | Milestone | Done when |
 | --- | --- | --- |
@@ -250,7 +252,8 @@ in order:
    (`codex exec`) via `$.process.spawn` in the project folder, streams its
    output into the panel, and appends a summary to the chat.
 
-Record the result in `docs/decisions/` and tell the owner before building.
+Record the result in `docs/decisions/`, build the option that works, and explain
+it in the PR.
 Local models vary a lot in tool use, so show a one-line hint on Local agents.
 
 ## 10. Testing rules
@@ -292,9 +295,9 @@ Local models vary a lot in tool use, so show a one-line hint on Local agents.
 - Load the `plugin-authoring` skill before writing mod code, and follow it for
   layout, types, testing and sharing.
 - Work inline in the session. Don't use subagents or per-task reviewer agents.
-- Make one milestone per branch and PR. Write commit messages and PR text in
-  plain words.
+- Build every milestone on one branch and one PR, committing after each. Write
+  commit messages and PR text in plain words.
 - Keep it small. Add no runtime dependencies without a clear need and a note in
   `docs/decisions/`.
-- When the API can't do something this plan assumes, stop and tell the owner in
-  plain words with the closest option. Don't quietly change the feature.
+- When the API can't do something this plan assumes, build the closest option
+  and say so in plain words in the PR. Don't change a feature silently.
