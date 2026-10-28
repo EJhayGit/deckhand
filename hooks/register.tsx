@@ -8,7 +8,7 @@ import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt, stopLoop } from '../src/loop'
 import { routeOf } from '../src/models'
-import { current, showStatus } from '../src/session'
+import { current, isHiddenAgent, showStatus } from '../src/session'
 import { renderBand } from '../src/ui/band'
 import { DECK, renderDeck } from '../src/ui/deck'
 
@@ -44,10 +44,13 @@ export const register: Register = (on, options) => {
     const composed = await next(e)
     const now = await current($)
     if (!now || now.card.agent.body.trim() === '') return composed
-    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}`
+    const skills = now.card.agent.skills?.length ? `\n\nUse these skills when they apply: ${now.card.agent.skills.join(', ')}.` : ''
+    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}${skills}`
 
     return { sections: [...composed.sections, { id: 'deckhand:agent', text, scope: 'session' as const }] }
   })
+
+  on('agent.offer', async ($, e, next) => ((await isHiddenAgent($, e.agent)) ? { isOffered: false } : next(e)))
 
   // The person's own prompt starts a loop when a Repeat chip is picked.
   on('prompt.submit', async ($, e, next) => {

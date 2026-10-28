@@ -39,6 +39,14 @@ export async function current($: EngineInterface): Promise<{ card: DeckAgent; ch
   return { card, chips: (await read($, chips)) ?? chipsOf(card.agent) }
 }
 
+// Built-in agents stay out of the model's agent list, so they cost no tokens,
+// except while swarm-lead is in use and hands work to them.
+export async function isHiddenAgent($: EngineInterface, agentType: string): Promise<boolean> {
+  const card = (await read($, deck)).find(c => c.agentType === agentType)
+
+  return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead'
+}
+
 export async function showStatus($: EngineInterface): Promise<void> {
   const now = await current($)
   $.ui.status(now ? statusText(now.card.agent, now.chips, await read($, loop)) : undefined)

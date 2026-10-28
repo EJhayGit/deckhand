@@ -35,7 +35,7 @@ test('/deck use and /deck none switch the agent', async ($, on) => {
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
   await pane.unmount()
 
-  expect((await $.command.run(deck('use ghost'))).text).toBe('No agent called ghost. Agents: reviewer.')
+  expect((await $.command.run(deck('use ghost'))).text).toMatch(/^No agent called ghost\. Agents: reviewer, .*swarm-lead\.$/)
   expect((await $.command.run(deck('none'))).text).toBe('No agent in use. Claude Code is back to normal.')
   expect(w.status.at(-1)).toBe(undefined)
 })

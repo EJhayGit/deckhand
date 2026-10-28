@@ -12,17 +12,50 @@ export type Agent = {
   icon?: string
   limits: Limits
   gateway: string | null
+  // Skills preloaded into the agent (Claude Code's `skills` key).
+  skills?: string[]
+  // Plugins the agent needs, as `<plugin>@<marketplace>` (under `deckhand:`).
+  plugins?: string[]
   body: string
 }
 
 // One card: the agent, where it came from, and its file text for round trips.
+// Built-in cards carry their catalog group and mascot hat.
 export type DeckAgent = {
   agent: Agent
-  source: 'project' | 'library'
+  source: 'project' | 'library' | 'builtin'
   isInLibrary: boolean
   text: string
   iconSvg?: string
+  group?: string
+  hat?: Hat
+  // The type `$.agent.spawn` takes: the file name, or `deckhand:<name>`.
+  agentType?: string
 }
+
+export type Hat = 'cap' | 'hardhat' | 'headphones' | 'beret' | 'antenna' | 'crown' | 'none'
+
+// One agent loop shown in the Runs view, from spawn to its turn's end.
+export type Run = {
+  agentId: string
+  title: string
+  name: string
+  model: string
+  effort?: Effort
+  color?: string
+  hat: Hat
+  startedAt: number
+  endedAt?: number
+  status: 'running' | 'done' | 'failed'
+  tokens: number
+  cost: number
+  lastInput: number
+  steps?: { done: number; total: number }
+}
+
+export type DeckTab = 'deck' | 'runs' | 'swarm'
+export type SwarmMode = 'parallel' | 'lead'
+export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 
 // What the chip band applies to this session, over the active agent's file.
 export type Chips = { model?: string; effort?: Effort; limits: Limits }
@@ -45,6 +78,12 @@ declare module 'claude-code' {
       menu: string | null
       confirm: string | null
       turnId: string | null
+      tab: DeckTab
+      collapsed: string[]
+      runs: Run[]
+      swarm: SwarmDraft
+      setup: string | null
+      enabledPlugins: string[]
     }
   }
 }

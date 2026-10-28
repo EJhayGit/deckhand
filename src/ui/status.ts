@@ -15,8 +15,22 @@ export const EFFORT_CHIPS: readonly { id: Effort; label: string }[] = [
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'XHigh' },
   { id: 'max', label: 'Max' },
 ]
+
+// The word the Runs view and cards show before the model, colored by weight.
+const WEIGHTS: Record<Effort, { word: string; color: string }> = {
+  low: { word: 'light', color: '#30a46c' },
+  medium: { word: 'medium', color: '#0090ff' },
+  high: { word: 'careful', color: '#f5a524' },
+  xhigh: { word: 'heavy', color: '#f76b15' },
+  max: { word: 'heavy', color: '#e5484d' },
+}
+
+export function weightOf(effort: Effort | undefined): { word: string; color: string } | undefined {
+  return effort ? WEIGHTS[effort] : undefined
+}
 
 export const COLORS: Record<string, string> = {
   red: '#e5484d',

@@ -12,8 +12,8 @@ export type AgentDoc = { agent: Agent; entries: Entry[]; deckhand: Entry[]; eol:
 
 export const READ_ONLY: Limits = { edit: false, run: false, internet: false }
 const EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max']
-const TOP_KEYS = ['name', 'description', 'model', 'effort', 'tools', 'disallowedTools', 'color'] as const
-const DECK_KEYS = ['icon', 'limits', 'gateway'] as const
+const TOP_KEYS = ['name', 'description', 'model', 'effort', 'tools', 'disallowedTools', 'color', 'skills'] as const
+const DECK_KEYS = ['icon', 'limits', 'gateway', 'plugins'] as const
 
 export function parseAgent(text: string): AgentDoc {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(text)
@@ -42,6 +42,8 @@ export function parseAgent(text: string): AgentDoc {
       internet: isObj(limits) && limits.internet === true,
     },
     gateway: str(deck('gateway')) ?? null,
+    skills: list(top('skills')),
+    plugins: list(deck('plugins')),
     body,
   }
 

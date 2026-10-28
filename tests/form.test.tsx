@@ -32,7 +32,7 @@ test('a starter fills the form, and the chips change it before saving', async ($
 
   await ui.press({ key: 'new-card' })
   await ui.input({ key: 'name', text: 'fixer' })
-  await ui.press({ key: 'starter-fixer' })
+  await ui.press({ key: 'starter-bug-fixer' })
   await ui.press({ key: 'feffort-high' })
   await ui.press({ key: 'fcan-internet' })
   await ui.press({ key: 'icon-5' })

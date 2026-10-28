@@ -15,15 +15,28 @@ test('the deck opens at session start', async ($, on) => {
   expect(w.opened).toEqual(['deck'])
 })
 
-test('the empty deck says so, on terminal and desktop', async ($, on) => {
-  world(on)
+test('built-in agents show in a fresh project, and register hidden from the model', async ($, on) => {
+  const w = world(on)
   await $.session.start(START)
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...PANE, surface })
 
-    expect((await ui.find({ type: 'Text', text: /empty/ }))?.text).toBe('Deck is empty')
+    expect(await ui.find({ type: 'Text', text: 'security-auditor' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'website-reviewer' })).toBeDefined()
     await ui.unmount()
   }
+  expect(w.agents.some(a => a.name === 'frontend-designer')).toBe(true)
+  expect(await $.agent.offer({ agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never)).toEqual({ isOffered: false })
+})
+
+test('a project file overrides the built-in of the same name', async ($, on) => {
+  world(on, { '.claude/agents/reviewer.md': agent('reviewer') })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Text', text: /The reviewer\./ })).toBeDefined()
+  expect(await ui.find({ key: 'more-reviewer' })).toBeDefined()
+  await ui.unmount()
 })
 
 test('cards show, and Use marks the active card, on terminal and desktop', async ($, on) => {
