@@ -24,10 +24,13 @@
 
 ## Open items
 
-- Not tried in a live session yet. Things only a live session can confirm:
-  - The Runs tab gets usage from `turn.step` of agents the mod spawned itself
-    (the API says other hooks see those steps; the test engine can't show it).
-  - `deck_progress` is answered for agents the mod spawned.
+- First live swarm (Launch kit, 2026-10-28): the four agents started from the
+  chat prompt and their rows showed in the Runs tab. Fixed after it: Parallel
+  now goes through the chat (auto mode refused direct spawns), and progress
+  calls match their run by part (they arrived without an agent id).
+- Still to confirm live:
+  - Tokens, cost and the timer move on each row (usage from `turn.step`).
+  - Steps like `2/4` show, now that progress calls match by part.
   - The `skills` names `<plugin>:<skill>` resolve once the plugins install.
   - The progress bar Box (`width="NN%"`, `height={1}`) draws on desktop.
 - Model prices in `src/models.ts` (`PRICES`) are list prices from 2026-10;
