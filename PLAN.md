@@ -290,7 +290,7 @@ Local models vary a lot in tool use, so show a one-line hint on Local agents.
 
 ## 12. v0.2: built-in agents, Runs and swarms
 
-Built on branch `build-v2` after 0.1.0. Details and reasons are in
+Built on branch `build-v2` after 0.1.0 and merged as PR #6. Details and reasons are in
 `docs/decisions/0004-agent-catalog-and-plugin-setup.md` and
 `0005-swarms-and-runs-view.md`.
 
@@ -303,8 +303,10 @@ Built on branch `build-v2` after 0.1.0. Details and reasons are in
   (light, medium, careful, heavy); XHigh effort chip.
 - **Runs:** a row per started agent with steps, ctx, tokens, estimated cost,
   time and a bar; Cost, Tokens and Time totals. No cost cap.
-- **Swarms (optional):** Parallel (presets or custom) and Lead (swarm-lead,
-  which allows everything so its workers keep their own limits).
+- **Swarms (optional):** Parallel (presets or custom; a prompt in the chat
+  asks Claude to start the agents, since auto mode refuses spawns nothing
+  asked for) and Lead (swarm-lead, which allows everything so its workers
+  keep their own limits).
 
 ## 13. Working rules for the building agent
 

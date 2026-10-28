@@ -65,6 +65,10 @@ Open the **Swarm** tab to run several agents on one task:
 
 Or type `/deck swarm launch-kit <task>` or `/deck swarm lead <task>`.
 
+Each agent in a swarm keeps its own limits: Claude Code holds it to the tools
+its file allows. The chip band's limits apply to the agent you clicked
+**Use** on; swarm-lead allows everything so its helpers aren't blocked.
+
 ### Runs
 
 The **Runs** tab shows every agent this session started, from a swarm or from
