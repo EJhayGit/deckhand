@@ -14,6 +14,7 @@
   delegates). `/deck swarm`.
 - Agents report steps to the Runs tab with the `deck_progress` tool.
 - XHigh effort chip.
+- MIT license.
 
 ## 0.1.0 (2026-10-28)
 
