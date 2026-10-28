@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 (2026-10-28)
+
+- swarm-lead now calls deck agents by their full type (`deckhand:reviewer`,
+  ...). Before, it used bare names, and the calls failed with "Agent type not
+  found".
+- Model chips show the version: Haiku 5.5, Sonnet 5.5, Opus 5.5, and the new
+  Fable 5.1. Agent files keep using the aliases.
+- The status line is gone. The chip band already shows the active agent.
+
 ## 0.2.0 (2026-10-28)
 
 - 16 built-in agents in every deck, in foldable groups: Core, Design,

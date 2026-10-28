@@ -75,7 +75,7 @@ test("the agent's instructions join the system prompt while it is active", async
   expect(after.sections[1]?.scope).toBe('session')
 })
 
-test('the band shows only while an agent is active, and its chips drive the status line', async ($, on) => {
+test('the band shows only while an agent is active, and its chips switch on and off', async ($, on) => {
   const w = world(on, { '.claude/agents/reviewer.md': agentFile('reviewer') })
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -92,15 +92,20 @@ test('the band shows only while an agent is active, and its chips drive the stat
   await useAgent($, 'reviewer')
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ ...BAND, surface })
+    const isOn = async (key: string) => (await band.find({ key }))?.props.variant === 'primary'
+    expect((await band.find({ key: 'model-opus' }))?.text).toBe('Opus 5.5')
     await band.press({ key: 'model-opus' })
     await band.press({ key: 'effort-high' })
-    expect(w.status.at(-1)).toBe('🔍 reviewer · Opus · high effort · read only')
+    expect([await isOn('model-opus'), await isOn('model-haiku'), await isOn('effort-high'), await isOn('can-edit')]).toEqual([true, false, true, false])
     await band.press({ key: 'can-edit' })
-    expect(w.status.at(-1)).toBe('🔍 reviewer · Opus · high effort · edits files')
+    expect(await isOn('can-edit')).toBe(true)
     await band.press({ key: 'can-edit' })
     await band.press({ key: 'effort-high' })
+    expect(await isOn('effort-high')).toBe(false)
     await band.unmount()
   }
+  // The status line stays clear: the band shows the agent.
+  expect(w.status.every(s => s === undefined)).toBe(true)
 })
 
 test('Save to agent appears when chips differ, and writes them to the file', async ($, on) => {

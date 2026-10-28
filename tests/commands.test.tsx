@@ -48,14 +48,15 @@ test('/deck use and /deck none switch the agent', async ($, on) => {
   await $.session.start(START)
 
   expect((await $.command.run(deck('use reviewer'))).text).toBe('Using reviewer.')
-  expect(w.status.at(-1)).toBe('🔍 reviewer · Haiku · read only')
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
-  await pane.unmount()
 
   expect((await $.command.run(deck('use ghost'))).text).toMatch(/^No agent called ghost\. Agents: reviewer, .*swarm-lead\.$/)
+  expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
   expect((await $.command.run(deck('none'))).text).toBe('No agent in use. Claude Code is back to normal.')
-  expect(w.status.at(-1)).toBe(undefined)
+  expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('Use')
+  await pane.unmount()
+  expect(w.status.every(s => s === undefined)).toBe(true)
 })
 
 test('/deck limits lists what the agent can do', async ($, on) => {
