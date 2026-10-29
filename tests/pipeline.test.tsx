@@ -38,7 +38,8 @@ test('a Normal Fix stops after Plan; Approve sends Tests; each step\'s answer be
   expect(w.submitted[1]).toContain(plan![0])
   expect(w.submitted[1]).toContain('Write a failing test that reproduces the bug')
 
-  // Tests ends: Build goes on its own, with no stop.
+  // Tests ends, having written a file: Build goes on its own, with no stop.
+  w.outputs['git status --porcelain'] = '?? auth.test.ts\n'
   await $.turn.start({ turnId: 't2', text: w.submitted[1] } as never)
   await $.turn.complete(ends('Added auth.test.ts; it fails.'))
   await clock.advance(1)
@@ -140,5 +141,105 @@ test('Kind and Size start on Auto, and the reason line follows the task as it is
   await clock.advance(1)
   expect(await ui.find({ type: 'Text', text: 'Size bumped to Big: the plan names 6 files.' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^Fix · Big · / })).toBeDefined()
+  await ui.unmount()
+})
+
+test('with researcher in use, Start runs Tests as test-writer and Build as the fixer, then puts researcher back', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'use-researcher' })
+
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  expect(await ui.find({ type: 'Text', text: 'test-writer' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'bug-fixer' })).toBeDefined()
+  await ui.press({ key: 'swarm-start' })
+  expect(w.submitted[0]).toContain('step 1/4: Tests')
+
+  await ui.press({ key: 'tab-deck' })
+  expect(await ui.find({ type: 'Text', text: 'In use: test-writer' })).toBeDefined()
+  await ui.press({ key: 'tab-swarm' })
+  await ui.press({ key: 'pipeline-stop' })
+  await ui.press({ key: 'tab-deck' })
+  expect(await ui.find({ type: 'Text', text: 'In use: researcher' })).toBeDefined()
+  await clock.advance(1)
+  await ui.unmount()
+})
+
+test('a read-only agent picked for Tests stops Start until that step uses plain Claude Code', async ($, on) => {
+  const w = world(on)
+  mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+
+  await ui.press({ key: 'agent-tests' })
+  await ui.press({ key: 'step-agent-researcher' })
+  await ui.press({ key: 'swarm-start' })
+  expect(w.submitted).toEqual([])
+  expect(await ui.find({ type: 'Text', text: 'Tests: researcher is missing Edit files, Run commands.' })).toBeDefined()
+
+  await ui.press({ key: 'preflight-plain-tests' })
+  await ui.press({ key: 'swarm-start' })
+  expect(w.submitted[0]).toContain('step 1/4: Tests')
+  await ui.press({ key: 'tab-deck' })
+  expect(await ui.find({ type: 'Text', text: /^In use:/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a step that changed nothing is blocked: the run stops there and offers Retry', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  await ui.press({ key: 'swarm-start' })
+
+  await $.turn.start({ turnId: 't', text: w.submitted[0] } as never)
+  await $.turn.complete(ends('Wrote the tests.'))
+  await clock.advance(1)
+  expect(w.submitted).toHaveLength(1)
+  expect(await ui.find({ type: 'Text', text: 'blocked' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Tests changed no files.' })).toBeDefined()
+  expect(await ui.find({ key: 'pipeline-change-agent' })).toBeDefined()
+  expect(w.toasts.at(-1)).toBe('Pipeline blocked at Tests: Tests changed no files.')
+
+  await ui.press({ key: 'pipeline-retry' })
+  expect(w.submitted).toHaveLength(2)
+  expect(w.submitted[1]).toContain('step 1/4: Tests')
+  await ui.unmount()
+})
+
+test('a needed tool call blocked by the limits blocks the step, even if files changed', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  await ui.press({ key: 'swarm-start' })
+
+  // The owner turns Run commands off for test-writer mid-step.
+  await ui.press({ key: 'tab-deck' })
+  await ui.press({ key: 'can-run' })
+  const denied = await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+  expect(JSON.stringify(denied)).toContain('Blocked: test-writer')
+  w.outputs['git status --porcelain'] = '?? a.test.ts\n'
+  await $.turn.start({ turnId: 't', text: w.submitted[0] } as never)
+  await $.turn.complete(ends('Wrote a.test.ts but could not run it.'))
+  await clock.advance(1)
+
+  await ui.press({ key: 'tab-swarm' })
+  expect(w.submitted).toHaveLength(1)
+  expect(await ui.find({ type: 'Text', text: /^Blocked: test-writer tried to run `npm test`/ })).toBeDefined()
+  expect(await ui.find({ key: 'pipeline-retry' })).toBeDefined()
   await ui.unmount()
 })

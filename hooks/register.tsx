@@ -9,7 +9,7 @@ import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, isHiddenAgent, showStatus } from '../src/session'
-import { onPipelineTurnEnd } from '../src/pipelineRun'
+import { onPipelineBlocked, onPipelineTurnEnd } from '../src/pipelineRun'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { DECK, renderDeck } from '../src/ui/deck'
@@ -124,6 +124,7 @@ export const register: Register = (on, options) => {
     const note = blockedNote(now.card.agent.name, e.tool, e as unknown as Record<string, unknown>, limit)
     $.ui.toast(note)
     $.ui.log(note)
+    if (e.agentId === undefined) await onPipelineBlocked($, note, limit)
 
     return { deny: note }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'Deckhand blocked this call because its limit check failed.' }))

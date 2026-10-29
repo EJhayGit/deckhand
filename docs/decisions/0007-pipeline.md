@@ -25,8 +25,9 @@ OK after Plan and before Commit (`PLAN.md` 14, Milestone 3).
 - **One step per turn.** At the turn's end the step is done; the next one is
   submitted, or the run stops at a gate. A gate shows the result in short
   form with Approve, Change (re-runs the step with a note) and Stop.
-- **Build and Commit** use the agent that was in use when the run started
-  (none: plain Claude Code). That agent is put back when the run ends.
+- **Build and Commit** used the agent that was in use when the run started.
+  Replaced by `0011-pipeline-step-agents.md`: each step now has its own
+  agent, checked before Start. The agent in use is still put back at the end.
 - **Runs** gets a row per step, like `Pipeline 3/5 · Tests`, with the turn's
   tokens and cost.
 - **Modes:** Pipeline (default) and Parallel. Lead and the swarm-lead agent

@@ -60,8 +60,12 @@ export type SwarmMode = 'pipeline' | 'parallel'
 export type PipeKind = 'feature' | 'fix' | 'change' | 'cleanup'
 export type PipeSize = 'tiny' | 'small' | 'normal' | 'big'
 export type PipeStepId = 'research' | 'plan' | 'tests' | 'build' | 'review' | 'commit'
-// gate: done, waiting for the owner's OK before the run goes on.
-export type PipeStep = { id: PipeStepId; agent: string | null; status: 'waiting' | 'running' | 'done' | 'gate' | 'failed'; summary?: string; error?: string }
+// gate: done, waiting for the owner's OK before the run goes on. blocked: a
+// limit stopped it, or it changed nothing it was meant to. `note`: why the
+// step runs as plain Claude Code.
+export type PipeStep = { id: PipeStepId; agent: string | null; status: 'waiting' | 'running' | 'done' | 'gate' | 'failed' | 'blocked'; summary?: string; error?: string; note?: string }
+// A step whose agent lacks a permission it needs, found at Start.
+export type PipeShortfall = { step: PipeStepId; agent: string; missing: (keyof Limits)[] }
 // One pipeline: `owner` is the agent in use when it started, put back at the
 // end; `prompt` is the step prompt in flight, matched at its turn's end.
 export type PipeRun = {
@@ -80,6 +84,10 @@ export type PipeRun = {
   // Review: merged findings, and `skeptic` while the skeptic checks them.
   findings?: Finding[]
   phase?: 'skeptic'
+  // The limit guard's note from the step in flight, and the files' state
+  // before a step that must edit.
+  blocked?: string
+  before?: string
 }
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
@@ -96,8 +104,19 @@ export type Finding = {
   proof?: string
 }
 // The Pipeline's choices (null: Auto, guessed from the task), the run, and the last
-// run ids (the folders under .deckhand/pipeline/).
-export type Pipeline = { kind: PipeKind | null; size: PipeSize | null; note: string; run: PipeRun | null; history: string[] }
+// run ids (the folders under .deckhand/pipeline/). `agents`: picked per step
+// for the next run (null: plain Claude Code); `picking`: the step whose agent
+// picker is open; `preflight`: why Start refused.
+export type Pipeline = {
+  kind: PipeKind | null
+  size: PipeSize | null
+  note: string
+  run: PipeRun | null
+  history: string[]
+  agents?: Partial<Record<PipeStepId, string | null>>
+  picking?: PipeStepId | null
+  preflight?: PipeShortfall[]
+}
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 
 // What the Deck's chips apply to this session, over the active agent's file.

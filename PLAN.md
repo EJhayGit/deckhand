@@ -448,9 +448,10 @@ Change sends the plan back with your note. Fix these first sends confirmed revie
 - Research: `researcher` (read only, internet on).
 - Plan: `planner`, or `architect` for Big. Output is a numbered task list of thin slices.
 - Tests: `test-writer` (now ECC's tdd-guide).
-- Build: the main chat with the active agent, so the owner watches the code change.
-- Review: Milestone 4.
-- Commit: the main chat, one commit per logical chunk.
+- Build: the main chat with the agent in use if it can edit and run, else `fixer` (or the built-in `bug-fixer`), else plain Claude Code.
+- Review: `reviewer`, plus `security-auditor` on security triggers (Milestone 4).
+- Commit: the main chat as plain Claude Code, one commit per logical chunk.
+- A missing default agent falls back to plain Claude Code. Each step's agent can be picked for one run, Start refuses a step whose agent lacks a permission it needs, and a step blocked by the limits (or that changed nothing when it should edit) stops the run with Retry and Change agent (`docs/decisions/0011-pipeline-step-agents.md`).
 
 **Hand-offs.** Each step writes its result to `.deckhand/pipeline/<run-id>/<nn>-<step>.md`, and the next step's prompt names that file. Files are the hand-off because the mod can't read a subagent's final answer directly. They also leave a record the owner can open.
 
@@ -510,5 +511,5 @@ The Review step runs several reviewers side by side, merges their duplicate find
 **Open questions for the owner**
 
 - [x] Keep Lead under "More", or remove it? Removed, with swarm-lead (2026-10-29).
-- [ ] Should Pipeline's Build step use the active agent or always a fixed one?
+- [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else a fixer (2026-10-29).
 - [ ] Any agent to add to or drop from the swap list in Milestone 2?
