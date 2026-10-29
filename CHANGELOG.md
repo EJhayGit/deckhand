@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+- **The Deck looks like a deck.** Each agent is a card in a grid with its
+  icon, name, status (`● in use`, `▶ running 1`, `○ ready`), model and what
+  it may do. **⋯** opens the card's details under the grid.
+- **Put on step:** put an agent card on a Pipeline step from its details;
+  the Swarm tab opens with it there. It's a click, not drag (decision 0014).
+- **Skill cards:** pinned skills and the agent in use's skills show as a row
+  of small cards on the Deck tab. The Skills tab uses small cards too.
+- **Pipeline steps are cards:** the Swarm tab shows the steps as a row of
+  cards with each one's agent and status, and every finished step's result
+  file. Blocked steps show `■ blocked`.
+- Shorter limit badges: `read only`, or `edit`, `run`, `web`.
+- A pending Delete stays on screen until you answer it, even with the card's
+  menu closed. The step agent picker closes once its step starts.
+
 ## 0.4.0 (unreleased)
 
 - **The Pipeline waits for each step's agent.** Before, a step sent through

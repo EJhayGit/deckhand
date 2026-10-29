@@ -30,7 +30,8 @@ This file is the source of truth when the two differ.
 - No required tests or verification gates. "Run tests after" is optional,
   off by default and comes later.
 - No separate app, local server, run records, worktrees or crash recovery.
-- No drag and drop in v1 (mod panels have buttons). A desktop-only drag
+- No drag and drop in v1 (mod panels have buttons). Cards are placed with a
+  click instead (**Put on step**, decision 0014). A desktop-only drag
   experiment is listed under Later.
 - No writes to `~/.claude/settings.json` or other global Claude Code settings.
 
@@ -121,14 +122,22 @@ The sketch page has the mockups. In words:
 ### Deck panel
 
 - A header with "Deck" and a "+ New" button.
-- One card per agent:
+- One card per agent, 24 columns wide, in a wrapping grid per group
+  (0.5.0, decision 0014):
   - icon tile in the agent's color
   - name
-  - a one-line summary (model and description)
-  - badges ("read only", "edits files", "runs commands", "internet")
-  - buttons: Use (shows "In use" when active), Edit, and a "…" menu with
-    Duplicate, Save to my library, Delete (with a confirm button)
+  - status as a glyph plus a word: `● in use`, `▶ running N`, `○ ready`
+  - a one-line description, then weight, model and effort
+  - badges ("read only", or "edit", "run", "web")
+  - buttons: Use (shows "In use" when active), Edit, and "⋯", which opens a
+    detail panel under the grid with Duplicate, Save to my library, Add to
+    this project, Delete (with a confirm row that stays up until answered)
+    and **Put on step** (one button per Pipeline step, when no run is going)
 - A dashed "+ New agent" card at the end.
+- A **Skills** row of small cards: pinned skills plus the agent in use's
+  skills (marked ●). A card opens the skill on the Skills tab.
+- The Swarm tab draws Pipeline steps as a wrapping row of step cards (icon,
+  number, agent, status); the step-agent picker uses small agent cards.
 - A "None" choice to turn the active agent off, so Claude Code goes back to normal.
 
 ### Chips in the Deck
@@ -514,3 +523,22 @@ The Review step runs several reviewers side by side, merges their duplicate find
 - [x] Keep Lead under "More", or remove it? Removed, with swarm-lead (2026-10-29).
 - [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else the builder (2026-10-29).
 - [x] Any agent to add to or drop from the swap list in Milestone 2? Added committer, code-explorer, silent-failure-hunter and code-simplifier (2026-10-29).
+
+## 15. 0.5.0: the deck as cards (2026-10-29)
+
+The owner asked for Deckhand to feel like a deck of cards. Built as
+decision 0014 (`docs/decisions/0014-card-deck.md`):
+
+- Agents are fixed-width cards in a wrapping grid with icon, name, status
+  and limits. "⋯" opens a detail panel under the grid.
+- A card goes into a task with a click: **Use** for the chat, **Put on step**
+  for a Pipeline step. No drag: the mod API only offers pointer input inside
+  a `Client` surface, which VS Code lacks (see Later).
+- Skills show as a second row of small cards on the Deck tab, and as small
+  cards on the Skills tab.
+- The Swarm tab draws Pipeline steps as cards; the current one has a bright
+  border, and a step moves on by redrawing, not animation.
+- No new state keys and no button key changes, so old saved state still loads.
+
+Still to check live: card width, hover borders and emoji alignment in the
+terminal and the desktop app.
