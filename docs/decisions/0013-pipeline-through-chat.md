@@ -77,8 +77,25 @@ The agent in use in the main chat is also told which tools are off for it
 
 ## Limits of this build
 
-- Still to confirm live: that auto mode allows the model's Agent call from
-  this prompt (Parallel's prompt passes), that the `background: false`
-  rewrite holds, and that `turn.start` text equals the submitted prompt.
-- If the rewrite is ignored and the agent runs in the background, the step
-  still waits for it. The chat's later "task finished" turn is ignored.
+- The `background: false` rewrite doesn't hold in the desktop app: its Agent
+  tool always runs subagents in the background. The step waits anyway,
+  because it ends on the agent's own `turn.complete`, and the chat's later
+  "task finished" turn is ignored.
+
+## Confirmed live (2026-10-29)
+
+- In a throwaway repo, a Normal run built a coffee-shop landing page end to
+  end: Plan → Tests (19 failing) → Build (19 of 19 pass) → Review (no
+  findings) → Commit (two Conventional Commits, nothing pushed). Each step
+  started only after the previous agent finished, and each result file holds
+  that agent's own answer, never the chat's "Done.".
+- Auto mode lets the model start the step's agent from the step prompt, and
+  `turn.start` text matches the submitted prompt.
+- Researcher's registered tools came out as exactly WebSearch, WebFetch and
+  `mcp__deckhand__deck_progress`; it did no repo reads.
+- Built-in `deckhand:*` agent types drop out of the model's list between step
+  prompts (`isHiddenAgent`); the next step prompt offers them again. An agent
+  mid-run may notice and mention it.
+- Review on new files only: `git diff HEAD` is empty, so the reviewers read the
+  untracked files the prompt names. Only `reviewer` ran (no TypeScript or
+  security trigger).
