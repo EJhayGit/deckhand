@@ -73,6 +73,8 @@ test("the agent's instructions join the system prompt while it is active", async
   expect(after.sections.map(s => s.id)).toEqual(['intro', 'deckhand:agent'])
   expect(after.sections[1]?.text).toContain('Do reviewer things.')
   expect(after.sections[1]?.scope).toBe('session')
+  // It is told what is off, so it doesn't try tools the guard will deny.
+  expect(after.sections[1]?.text).toContain('Off for you (Deckhand blocks these tools): Edit files (Edit, Write, MultiEdit, NotebookEdit); Run commands (Bash, PowerShell); Internet (WebFetch, WebSearch).')
 })
 
 test('the chips show in the Deck only while an agent is active, never above the prompt', async ($, on) => {

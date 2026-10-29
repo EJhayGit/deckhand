@@ -1,6 +1,7 @@
 // A memory world beneath the plugin for tests: files, store, and what the mod
 // showed (toasts, transcript lines, status, registered agents and commands).
 import { mock } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 export type World = {
@@ -20,10 +21,13 @@ export type World = {
   outputs: Record<string, string>
   reply: { ok: boolean; status: number; text: string } | 'refused'
   enabledPlugins: Record<string, boolean>
-  spawned: { subagentType: string; description: string; prompt: string }[]
+  spawned: { subagentType: string; description: string; prompt: string; background?: boolean }[]
   // Set: agent.spawn refuses with this reason.
   spawnDeny?: string
   commands: { name: string; description: string; source: 'builtin' | 'plugin' | 'user' | 'mcp'; plugin?: string }[]
+  // playChat: prompts already played, and the open chat turn's agents.
+  played: number
+  open?: string[]
 }
 
 export function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}): World {
@@ -45,6 +49,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     enabledPlugins: {},
     spawned: [],
     commands: [],
+    played: 0,
   }
   mock.store(on, store)
   known = Object.keys(files)
@@ -101,7 +106,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     if (w.spawnDeny) return { deny: w.spawnDeny }
     const call = e as typeof e & { subagent_type?: string }
     const subagentType = call.subagentType ?? call.subagent_type ?? ''
-    w.spawned.push({ subagentType, description: e.description, prompt: e.prompt })
+    w.spawned.push({ subagentType, description: e.description, prompt: e.prompt, background: (e as { background?: boolean }).background })
     const agentId = `a${w.spawned.length}`
     return { model: 'claude-sonnet-5-5', agentId, ...('subagent_type' in call ? { result: { agentId, agentType: subagentType } } : {}) } as never
   })
@@ -187,3 +192,43 @@ export const turnEnds = (reason: 'answer' | 'aborted' | 'error' = 'answer', agen
   reason,
   ...(agentId ? { agentId } : {}),
 })
+
+type Clock = { advance: (ms: number) => Promise<void> }
+
+// The agent types a Pipeline step prompt asks the chat to start.
+function typesIn(text: string): string[] {
+  const one = /subagent_type `([^`]+)`/.exec(text)
+  return one ? [one[1]!] : [...text.matchAll(/^\d+\. `([^`]+)`/gm)].map(m => m[1]!)
+}
+
+// Plays the chat's part in a Pipeline: each new step prompt (sent once the
+// clock moves) opens a main turn that starts the agents it names, as the
+// model's own Agent calls.
+export async function playChat($: Engine, w: World, clock: Clock) {
+  await clock.advance(1)
+  while (w.played < w.submitted.length) {
+    const text = w.submitted[w.played++]!
+    if (!text.startsWith('Start the `') && !text.startsWith('Deckhand pipeline')) continue
+    await $.turn.start({ turnId: `t${w.played}`, text } as never)
+    w.open = []
+    for (const type of typesIn(text)) {
+      const before = w.spawned.length
+      await $.agent.spawn({ subagentType: type, prompt: text, description: 'picked by the model' } as never).catch(() => undefined)
+      if (w.spawned.length > before) w.open.push(`a${w.spawned.length}`)
+    }
+  }
+}
+
+// Subagent number `n` (default: the last) ends with `answer`. Once the chat
+// turn's agents have all ended, that turn ends too, replying only Done.
+export async function agentEnds($: Engine, w: World, clock: Clock, answer: string, reason: 'answer' | 'aborted' | 'error' = 'answer', n = w.spawned.length) {
+  await $.turn.complete({ ...turnEnds(reason, `a${n}`), answer })
+  if (w.open) {
+    w.open = w.open.filter(id => id !== `a${n}`)
+    if (w.open.length === 0) {
+      w.open = undefined
+      await $.turn.complete({ ...turnEnds(), answer: 'Done.' })
+    }
+  }
+  await playChat($, w, clock)
+}

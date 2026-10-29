@@ -49,7 +49,7 @@ test('/deck use and /deck none switch the agent', async ($, on) => {
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
 
-  expect((await $.command.run(deck('use ghost'))).text).toMatch(/^No agent called ghost\. Agents: reviewer, .*builder\.$/)
+  expect((await $.command.run(deck('use ghost'))).text).toMatch(/^No agent called ghost\. Agents: reviewer, .*code-simplifier\.$/)
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('In use')
   expect((await $.command.run(deck('none'))).text).toBe('No agent in use. Claude Code is back to normal.')
   expect((await pane.find({ key: 'use-reviewer' }))?.text).toBe('Use')

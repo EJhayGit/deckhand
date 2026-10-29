@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parallelPrompt } from '../src/swarm'
-import { PANE, START, turnEnds, world } from './world'
+import { PANE, START, playChat, turnEnds, world } from './world'
 
 const OFFER = { agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never
 
@@ -65,7 +65,7 @@ test('Custom picks ask only for the picked agents, a project one by its file nam
 
 test('a draft saved while Lead existed opens and starts as a Pipeline', async ($, on) => {
   const w = world(on)
-  mock.clock(on)
+  const clock = mock.clock(on)
   // The swarm draft reads back as one an older version saved, in Lead mode.
   on('state.get', { plugin: 'deckhand', key: 'swarm' } as never, async (_, e, next) => {
     const read = await next(e)
@@ -77,6 +77,7 @@ test('a draft saved while Lead existed opens and starts as a Pipeline', async ($
   await ui.press({ key: 'tab-swarm' })
   expect(await ui.find({ key: 'mode-lead' })).toBeUndefined()
   await ui.press({ key: 'swarm-start' })
+  await playChat($, w, clock)
   expect(w.spawned[0]?.prompt).toContain('Deckhand pipeline')
   // The task came from the seeded draft, so the old Lead draft was read.
   expect(w.spawned[0]?.prompt).toContain('Add dark mode')

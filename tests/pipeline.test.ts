@@ -18,13 +18,14 @@ const running = (run: PipeRun, i: number): PipeRun => ({ ...run, steps: run.step
 
 const READ = { edit: false, run: false, internet: false }
 const BUILD = { edit: true, run: true, internet: false }
-const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD, builder: BUILD }
+const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD, builder: BUILD, committer: { ...READ, run: true } }
 
-test('each step has its default agent: architect plans Big, the agent in use builds, plain Claude Code commits', () => {
+test('each step has its default agent: architect plans Big, the agent in use builds, the committer commits', () => {
   const agents = (size: 'normal' | 'big') => newPipeline('x', 't', 'feature', size, 'fixer', DECK).steps.map(s => s.agent)
-  expect(agents('normal')).toEqual(['planner', 'test-writer', 'fixer', 'reviewer', null])
-  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'fixer', 'reviewer', null])
+  expect(agents('normal')).toEqual(['planner', 'test-writer', 'fixer', 'reviewer', 'committer'])
+  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'fixer', 'reviewer', 'committer'])
   expect(newPipeline('x', 't', 'feature', 'tiny', null).steps[0]!.agent).toBeNull()
+  expect(agentFor('commit', 'small', null, { builder: BUILD })).toEqual({ agent: null, note: 'No committer agent installed: plain Claude Code commits.' })
 })
 
 test('Build: the agent in use if it can edit and run, else the builder, else plain Claude Code', () => {
@@ -45,7 +46,7 @@ test('a missing default agent falls back to plain Claude Code and says so', () =
 
 test('an override picks a step agent for this run; withAgent changes a waiting step only', () => {
   const run = newPipeline('x', 't', 'feature', 'normal', null, DECK, { tests: 'fixer', plan: null })
-  expect(run.steps.map(s => s.agent)).toEqual([null, 'fixer', 'builder', 'reviewer', null])
+  expect(run.steps.map(s => s.agent)).toEqual([null, 'fixer', 'builder', 'reviewer', 'committer'])
   const done = { ...run, steps: run.steps.map((s, i) => (i === 0 ? { ...s, status: 'done' as const } : s)) }
   expect(withAgent(done, 'plan', 'architect').steps[0]!.agent).toBeNull()
   expect(withAgent(done, 'tests', 'test-writer').steps[1]!.agent).toBe('test-writer')
@@ -68,7 +69,8 @@ test('each step spawns its deck agent\'s type; plain Claude Code is general-purp
   expect(typeOf(null, cards)).toBe('general-purpose')
   const sent = chatPrompt('deckhand:test-writer', 'Write the tests.')
   expect(sent).toContain('subagent_type `deckhand:test-writer`')
-  expect(sent).toContain('Do none of the work yourself.')
+  expect(sent).toMatch(/not in\s+the background/)
+  expect(sent).toContain('reply only: Done.')
   expect(sent.endsWith('Write the tests.')).toBe(true)
 })
 

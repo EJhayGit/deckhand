@@ -1,6 +1,6 @@
 {
   "name": "deckhand",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "types": "./types/index.d.ts",
   "author": { "name": "EJhayGit" },
   "license": "MIT",

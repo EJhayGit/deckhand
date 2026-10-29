@@ -44,6 +44,7 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
   if (shown.kind === 'form') return renderForm($, e, shown.draft)
 
   const { Box, Text, Button } = $.ui.resolve(e)
+  const version = await versionOf($)
   const now = await read($, tab)
   const body = now === 'runs' ? await renderRuns($, e)
     : now === 'swarm' ? await renderSwarm($, e)
@@ -53,7 +54,7 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="row" justifyContent="space-between">
-        <Text bold>Deck</Text>
+        <Text bold>Deck{version ? ` v${version}` : ''}</Text>
         <Button key="new" label="+ New" onPress={() => openNew($)} />
       </Box>
       <Box flexDirection="row" gap={1}>
@@ -64,6 +65,22 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
       {body}
     </Box>
   )
+}
+
+// The running build's version, from the plugin's own manifest; kept once found.
+let version: string | undefined
+
+async function versionOf($: EngineInterface): Promise<string | undefined> {
+  if (version !== undefined) return version
+  const text = await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`).catch(() => undefined)
+  try {
+    const found = typeof text === 'string' ? (JSON.parse(text) as { version?: unknown }).version : undefined
+    if (typeof found === 'string') version = found
+  } catch {
+    // A broken manifest: the header shows plain Deck.
+  }
+
+  return version
 }
 
 async function renderCards($: EngineInterface, e: RenderInput) {

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+- **The Pipeline waits for each step's agent.** Before, a step sent through
+  the chat finished as soon as the chat's own turn ended, even when the agent
+  it started was still running in the background, so the next step began
+  early with no real result. Now the step finishes only when the agent the
+  chat started gives its own final answer, and that answer is the result.
+- **Start goes through the chat.** Claude Code refuses agents started from
+  the panel, so every step (Review's reviewers and the skeptic too) is typed
+  into the chat as one prompt. Its agents run in the foreground, so the chat
+  turn waits for them. **Send through chat** is gone: it's how every step runs.
+  A chat turn that starts no agent blocks the step with **Retry**.
+- **New built-in agents:** committer (writes Conventional Commits messages
+  that match your git log and commits, never pushes; the Commit step uses it),
+  code-explorer, silent-failure-hunter and code-simplifier, all adapted from
+  ECC.
+- **Researcher is web only:** its only tools are web search and web fetch, so
+  it researches online instead of reading the repo. The Research step says so.
+- docs-writer can now run commands (ECC's doc-updater can), and builder no
+  longer commits after each slice: the committer does that after Review.
+- The agent in use is told which tools are off for it, so it stops trying them.
+- The panel's title shows the version, like `Deck v0.4.0`.
+
 ## 0.3.3 (unreleased)
 
 - **New built-in agent: builder.** It builds a feature from a plan, slice by
