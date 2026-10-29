@@ -65,3 +65,11 @@ export function iconText(agent: Agent): string {
 
   return (agent.name[0] ?? '?').toUpperCase()
 }
+
+// A card's status: glyph plus word, never color alone. Running outranks in use.
+export function cardStatus(isActive: boolean, running: number): { glyph: string; word: string; color: string } {
+  if (running > 0) return { glyph: '▶', word: `running ${running}`, color: 'warning' }
+  if (isActive) return { glyph: '●', word: 'in use', color: 'success' }
+
+  return { glyph: '○', word: 'ready', color: COLORS.gray! }
+}

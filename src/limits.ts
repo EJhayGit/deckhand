@@ -54,9 +54,9 @@ export function offText(limits: Limits): string | undefined {
 
 export function badges(limits: Limits): string[] {
   const on = [
-    limits.edit && 'edits files',
-    limits.run && 'runs commands',
-    limits.internet && 'internet',
+    limits.edit && 'edit',
+    limits.run && 'run',
+    limits.internet && 'web',
   ].filter((b): b is string => typeof b === 'string')
 
   return on.length === 0 ? ['read only'] : on

@@ -72,7 +72,9 @@ the agent in use.
 ### Pipeline
 
 The **Swarm** tab opens on **Pipeline**: a task runs through steps, each
-building on the last one's result, and it stops for your OK.
+building on the last one's result, and it stops for your OK. Each step is a
+card in a row, showing its agent and status (`○ waiting`, `▶ running`,
+`✓ done`, `■ blocked`); the run moves across the row as steps finish.
 
 1. Type the task. **Kind** (Feature, Fix, Change, Clean up) and **Size**
    start on **Auto**: Deckhand guesses them from your words and says why, for
@@ -145,9 +147,17 @@ Chip changes apply to this session at once.
 
 ### Cards
 
-Each card has **Use**, **Edit** and a **…** menu with Duplicate, Save to my
-library, and Delete (asks first). Library agents show in every project; use
-**Add to this project** to write one out as a file.
+The Deck tab shows each agent as a card in a grid: icon, name, status
+(`● in use`, `▶ running 1`, `○ ready`), model and what it may do. Each card
+has **Use**, **Edit** and **⋯**. Click **⋯** to open its details:
+Duplicate, Save to my library, Add to this project, and Delete (asks first).
+Library agents show in every project.
+
+To put an agent on a Pipeline step, click **⋯**, then a step under **Put on
+step**. The Swarm tab opens with that agent on the step.
+
+Below the agents, a **Skills** row shows your pinned skills and the skills of
+the agent in use (marked ●). Click one to open it on the Skills tab.
 
 ### Slash commands
 

@@ -2,9 +2,21 @@
 
 ## State
 
-- 0.3.3 (builder agent) is merged (PR #15) and tagged `v0.3.3`.
-- **0.4.0 is on branch `claude/swarm-pipeline-issues-b16336`, one PR, not
-  merged** (`docs/decisions/0013-pipeline-through-chat.md`):
+- **0.5.0 is on branch `claude/deck-da3e4a`, PR #17, not merged**
+  (`docs/decisions/0014-card-deck.md`, PLAN §15). The deck as cards:
+  - Agents are 24-column cards in a wrapping grid (icon, name, status from
+    `cardStatus` in `src/ui/status.ts`, model, short limit badges). "⋯"
+    opens a detail panel with **Put on step** (calls `pickAgent`).
+  - A Skills row of small cards on the Deck tab; the Skills tab uses cards.
+  - Pipeline steps draw as a row of step cards in `src/ui/swarm.tsx`; the
+    picker uses `renderMiniCard` (`src/ui/miniCard.tsx`, its own file so
+    deck.tsx and swarm.tsx don't import each other).
+  - No new state keys; every button key is unchanged.
+  - Built by a Deckhand Pipeline run (20261029-102335); review fixes made
+    inline. Checks: validate passes, 149 tests pass. `tsc` was not run
+    (TypeScript isn't installed in that worktree).
+- 0.4.0 (PR #16) is merged.
+- Earlier 0.4.0 notes (`docs/decisions/0013-pipeline-through-chat.md`):
   - Every Pipeline step goes through the chat. The step's agent is captured
     in the `agent.spawn` hook and only its own answer finishes the step
     (Deckhand asks for the foreground; the desktop app runs it in the
@@ -39,7 +51,15 @@
 Owner, from the dev-mod copy, with the marketplace deckhand turned off (it's
 0.3.1, and two copies fight):
 
-The live run passed. Merge PR #16 when happy, then tag `v0.4.0`.
+Open the Deck from the dev-mod copy and check the cards in the terminal and
+the desktop app: card width, hover borders, emoji icons lining up with the
+borders, Put on step, and a Pipeline run moving across the step cards. Then
+merge PR #17 and tag `v0.5.0` (tag `v0.4.0` too if it isn't yet).
+
+Left-over low review items on PR #17 (not fixed, by the owner's choice):
+Put on step after an ended run isn't visible until Clear; dead skill cards
+for uninstalled pinned skills; step notes don't name their step; "needs
+<plugin>" can overflow a narrow card.
 
 Possible follow-up: Review gets an empty diff when every file is new; adding
 untracked files to the saved diff (`git add -N` or `git diff --no-index`)

@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import { PANE, SURFACES, world } from './world'
 
@@ -56,8 +56,8 @@ test('cards show, and Use marks the active card, on terminal and desktop', async
     const ui = await $.ui.mount({ ...PANE, surface })
 
     expect(await ui.find({ type: 'Text', text: 'reviewer' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /\[read only\]/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /\[edits files\] \[runs commands\]/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /read only/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /edit · run/ })).toBeDefined()
     expect((await ui.find({ key: 'use-reviewer' }))?.text).toBe('Use')
 
     await ui.press({ key: 'use-reviewer' })
@@ -70,6 +70,28 @@ test('cards show, and Use marks the active card, on terminal and desktop', async
     await ui.unmount()
   }
   expect(w.status.every(s => s === undefined)).toBe(true)
+})
+
+test('a card shows its status: in use after Use, running while its subagent runs', async ($, on) => {
+  world(on, { '.claude/agents/reviewer.md': agent('reviewer'), '.claude/agents/fixer.md': agent('fixer', '{ edit: true, run: true, internet: false }') })
+  mock.clock(on)
+  await $.session.start(START)
+
+  for (const surface of SURFACES) {
+    const ui = await $.ui.mount({ ...PANE, surface })
+
+    expect(await ui.find({ type: 'Text', text: '● in use' })).toBeUndefined()
+    await ui.press({ key: 'use-reviewer' })
+    expect(await ui.find({ type: 'Text', text: '● in use' })).toBeDefined()
+    await ui.press({ key: 'none' })
+    await ui.unmount()
+  }
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /running/ })).toBeUndefined()
+  await $.agent.spawn({ prompt: 'Fix it.', subagentType: 'deckhand:fixer', description: 'Fix' } as never)
+  expect(await ui.find({ type: 'Text', text: '▶ running 1' })).toBeDefined()
+  await ui.unmount()
 })
 
 test('Duplicate writes a copy, and Delete asks first', async ($, on) => {
@@ -86,6 +108,9 @@ test('Duplicate writes a copy, and Delete asks first', async ($, on) => {
   await ui.press({ key: 'more-reviewer-copy' })
   await ui.press({ key: 'del-reviewer-copy' })
   expect(w.files.has('.claude/agents/reviewer-copy.md')).toBe(true)
+  // Closing the menu doesn't hide a pending delete.
+  await ui.press({ key: 'more-reviewer-copy' })
+  expect(await ui.find({ key: 'del-reviewer-copy' })).toBeUndefined()
   await ui.press({ key: 'confirm-del-reviewer-copy' })
   expect(w.files.has('.claude/agents/reviewer-copy.md')).toBe(false)
   expect(await ui.find({ type: 'Text', text: 'reviewer-copy' })).toBeUndefined()

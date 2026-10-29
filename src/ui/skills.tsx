@@ -21,25 +21,28 @@ export async function renderSkills($: EngineInterface, e: RenderInput) {
   const set = (change: Partial<SkillsView>) => update($, view, now => ({ ...now, ...change }))
   const hasInput = 'Input' in elements
 
-  const row = (s: Skill, group: string) => {
-    const isPinned = pins.includes(s.id)
-    const isOpen = v.open === s.id
+  // Small cards in a wrapping row; the open skill's panel sits under its group.
+  const card = (s: Skill, group: string) => (
+    <Box key={`skill-${group}-${s.id}`} flexDirection="column" width={26} borderStyle="round" borderDimColor={v.open !== s.id} paddingX={1}>
+      <Box flexDirection="row" gap={1}>
+        <Button key={`open-${group}-${s.id}`} plain label={`/${s.id}`} onPress={() => set({ open: v.open === s.id ? null : s.id, note: '' })} />
+        <Button key={`pin-${group}-${s.id}`} plain label={pins.includes(s.id) ? '★' : '☆'} onPress={() => togglePin($, s.id)} />
+      </Box>
+      {s.description !== '' && <Text dimColor wrap="truncate-end">{s.description}</Text>}
+    </Box>
+  )
+  // A skill in Pinned and its own group opens once: an Input takes one key.
+  let isShown = false
+  const panel = (s: Skill) => {
+    if (v.open !== s.id || isShown) return undefined
+    isShown = true
     return (
-      <Box key={`skill-${group}-${s.id}`} flexDirection="column">
+      <Box key={`panel-${s.id}`} flexDirection="column" gap={1} paddingX={1}>
+        {hasInput && <elements.Input key={`note-${s.id}`} label={`/${s.id} note (optional)`} placeholder="what to run it on" value={v.note} onInput={note => set({ note })} onSubmit={note => set({ note })} />}
         <Box flexDirection="row" gap={1}>
-          <Button key={`open-${group}-${s.id}`} plain label={`/${s.id}`} onPress={() => set({ open: isOpen ? null : s.id, note: '' })} />
-          <Button key={`pin-${group}-${s.id}`} plain label={isPinned ? '★' : '☆'} onPress={() => togglePin($, s.id)} />
+          <Button key={`run-${s.id}`} label="Run" variant="primary" onPress={() => run($, s.id, v.note)} />
+          <Button key={`add-${s.id}`} label="Add to agent" onPress={() => addToAgent($, s.id)} />
         </Box>
-        {s.description !== '' && <Text dimColor wrap="truncate-end">{s.description}</Text>}
-        {isOpen && (
-          <Box flexDirection="column" gap={1} paddingX={1}>
-            {hasInput && <elements.Input key={`note-${s.id}`} label="Note (optional)" placeholder="what to run it on" value={v.note} onInput={note => set({ note })} onSubmit={note => set({ note })} />}
-            <Box flexDirection="row" gap={1}>
-              <Button key={`run-${s.id}`} label="Run" variant="primary" onPress={() => run($, s.id, v.note)} />
-              <Button key={`add-${s.id}`} label="Add to agent" onPress={() => addToAgent($, s.id)} />
-            </Box>
-          </Box>
-        )}
       </Box>
     )
   }
@@ -52,7 +55,10 @@ export async function renderSkills($: EngineInterface, e: RenderInput) {
       {groups.map(g => (
         <Box key={`skills-${g.name}`} flexDirection="column" gap={1}>
           <Text bold>{g.name} · {g.skills.length}</Text>
-          {g.skills.map(s => row(s, g.name))}
+          <Box flexDirection="row" gap={1} flexWrap="wrap">
+            {g.skills.map(s => card(s, g.name))}
+          </Box>
+          {g.skills.map(panel)}
         </Box>
       ))}
     </Box>

@@ -206,6 +206,54 @@ test('a read-only agent picked for Tests stops Start until that step uses plain 
   await ui.unmount()
 })
 
+test('a deck card is put on a Pipeline step with Put on step, and Start uses it', async ($, on) => {
+  const w = world(on, { '.claude/agents/fixer.md': agentFile('fixer', '{ edit: true, run: true, internet: false }') })
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  await ui.press({ key: 'tab-deck' })
+
+  await ui.press({ key: 'more-fixer' })
+  await ui.press({ key: 'place-fixer-tests' })
+  expect(await ui.find({ key: 'agent-tests' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'fixer' })).toBeDefined()
+
+  await ui.press({ key: 'swarm-start' })
+  await playChat($, w, clock)
+  expect(w.spawned[0]!.subagentType).toBe('fixer')
+  expect(w.spawned[0]!.prompt).toContain('step 1/4: Tests')
+  await ui.unmount()
+})
+
+test('the step track shows each step card with its status as the run moves', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Fix the login redirect loop' })
+  await ui.press({ key: 'kind-fix' })
+  await ui.press({ key: 'size-normal' })
+  await ui.press({ key: 'swarm-start' })
+  await playChat($, w, clock)
+  await agentEnds($, w, clock, 'the plan')
+
+  expect(await ui.find({ type: 'Text', text: /✓ done/ })).toBeDefined()
+  await ui.press({ key: 'agent-tests' })
+  expect(await ui.find({ key: 'step-agent-cancel' })).toBeDefined()
+  await ui.press({ key: 'pipeline-approve' })
+  await playChat($, w, clock)
+  expect(await ui.find({ type: 'Text', text: /✓ done/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /▶ running/ })).toBeDefined()
+  // A done step keeps its result file; the picker closed once Tests started.
+  expect(await ui.find({ type: 'Text', text: /01-plan\.md/ })).toBeDefined()
+  expect(await ui.find({ key: 'step-agent-cancel' })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('a step that changed nothing is blocked: the run stops there and offers Retry', async ($, on) => {
   const w = world(on)
   const clock = mock.clock(on)
