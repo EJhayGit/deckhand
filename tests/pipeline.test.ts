@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { after, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, runId, stepPrompt, stepsFor } from '../src/pipeline'
+import { after, agentAfter, agentFor, autoText, blockedIn, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, preflight, runId, shortfallText, stepPrompt, stepsFor, withAgent } from '../src/pipeline'
 import type { PipeRun } from '../types'
 
 test('every size runs the steps in the plan\'s table, for every kind', () => {
@@ -13,11 +13,74 @@ test('every size runs the steps in the plan\'s table, for every kind', () => {
   }
 })
 
-test('each step has its agent: architect plans Big, the owner\'s agent builds and commits', () => {
-  const agents = (size: 'normal' | 'big') => newPipeline('x', 't', 'feature', size, 'fixer').steps.map(s => s.agent)
-  expect(agents('normal')).toEqual(['planner', 'test-writer', 'fixer', 'reviewer', 'fixer'])
-  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'fixer', 'reviewer', 'fixer'])
+const running = (run: PipeRun, i: number): PipeRun => ({ ...run, steps: run.steps.map((s, j) => (j === i ? { ...s, status: 'running' } : j < i ? { ...s, status: 'done' } : s)) })
+
+const READ = { edit: false, run: false, internet: false }
+const BUILD = { edit: true, run: true, internet: false }
+const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD }
+
+test('each step has its default agent: architect plans Big, the agent in use builds, plain Claude Code commits', () => {
+  const agents = (size: 'normal' | 'big') => newPipeline('x', 't', 'feature', size, 'fixer', DECK).steps.map(s => s.agent)
+  expect(agents('normal')).toEqual(['planner', 'test-writer', 'fixer', 'reviewer', null])
+  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'fixer', 'reviewer', null])
   expect(newPipeline('x', 't', 'feature', 'tiny', null).steps[0]!.agent).toBeNull()
+})
+
+test('Build: the agent in use if it can edit and run, else fixer, else bug-fixer, else plain Claude Code', () => {
+  const tester = { ...DECK, mine: BUILD }
+  expect(agentFor('build', 'small', 'mine', tester)).toEqual({ agent: 'mine' })
+  expect(agentFor('build', 'small', 'researcher', DECK)).toEqual({ agent: 'fixer' })
+  expect(agentFor('build', 'small', null, DECK)).toEqual({ agent: 'fixer' })
+  const { fixer: _, ...noFixer } = DECK
+  expect(agentFor('build', 'small', 'researcher', noFixer)).toEqual({ agent: 'bug-fixer' })
+  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher })).toEqual({ agent: null, note: 'No fixer agent installed: plain Claude Code builds.' })
+})
+
+test('a missing default agent falls back to plain Claude Code and says so', () => {
+  const { 'test-writer': _, ...deck } = DECK
+  const tests = newPipeline('x', 't', 'feature', 'small', null, deck).steps[0]!
+  expect(tests).toEqual({ id: 'tests', agent: null, status: 'waiting', note: 'No test-writer agent installed: plain Claude Code runs this step.' })
+})
+
+test('an override picks a step agent for this run; withAgent changes a waiting step only', () => {
+  const run = newPipeline('x', 't', 'feature', 'normal', null, DECK, { tests: 'fixer', plan: null })
+  expect(run.steps.map(s => s.agent)).toEqual([null, 'fixer', 'fixer', 'reviewer', null])
+  const done = { ...run, steps: run.steps.map((s, i) => (i === 0 ? { ...s, status: 'done' as const } : s)) }
+  expect(withAgent(done, 'plan', 'architect').steps[0]!.agent).toBeNull()
+  expect(withAgent(done, 'tests', 'test-writer').steps[1]!.agent).toBe('test-writer')
+})
+
+test('preflight: a read-only Tests agent stops Start; plain Claude Code and fit agents pass', () => {
+  const run = newPipeline('x', 't', 'feature', 'normal', null, DECK, { tests: 'researcher' })
+  const short = preflight(run.steps, DECK)
+  expect(short).toEqual([{ step: 'tests', agent: 'researcher', missing: ['edit', 'run'] }])
+  expect(shortfallText(short[0]!)).toBe('Tests: researcher is missing Edit files, Run commands.')
+  expect(preflight(newPipeline('x', 't', 'feature', 'big', 'planner', DECK).steps, DECK)).toEqual([])
+  expect(preflight(withAgent(run, 'tests', null).steps, DECK)).toEqual([])
+})
+
+test('the agent in use at Start is put back when the run ends or stops', () => {
+  const run = newPipeline('x', 't', 'feature', 'normal', 'researcher', DECK)
+  const stopped = after(run, { kind: 'stop' }).run
+  expect(agentAfter(stopped, DECK)).toBe('researcher')
+  expect(agentAfter({ owner: null }, DECK)).toBeNull()
+  expect(agentAfter({ owner: 'gone' }, DECK)).toBeNull()
+})
+
+test('blocked: a needed permission stops the step until Retry; a stray edit in a read-only step does not', () => {
+  const note = 'Blocked: researcher tried to edit `a.ts`, but Edit files is off for this agent.'
+  expect(blockedIn(`I couldn't.\n${note}`, 'tests')).toBe(note)
+  expect(blockedIn(note, 'plan')).toBeUndefined()
+  expect(blockedIn('All done.', 'build')).toBeUndefined()
+
+  const run = running(newPipeline('r1', 't', 'feature', 'small', null, DECK), 0)
+  const blocked = after(run, { kind: 'blocked', reason: note })
+  expect(blocked.next).toBeNull()
+  expect(blocked.run.ended).toBeUndefined()
+  expect(blocked.run.steps[0]).toMatchObject({ status: 'blocked', error: note })
+  const retried = after(blocked.run, { kind: 'retry' })
+  expect(retried.next).toBe(0)
+  expect(retried.run.steps[0]!.status).toBe('waiting')
 })
 
 test('kind: each rule, in order, with its reason; Feature by default', () => {
@@ -73,8 +136,6 @@ test('Fix starts with a failing test; Clean up keeps the tests green', () => {
   expect(gatesText('normal')).toBe('Plan → Tests → Build → Review → Commit · stops for your OK after Plan, before Commit')
   expect(gatesText('tiny')).toBe('Build → Review → Commit · stops for your OK before Commit')
 })
-
-const running = (run: PipeRun, i: number): PipeRun => ({ ...run, steps: run.steps.map((s, j) => (j === i ? { ...s, status: 'running' } : j < i ? { ...s, status: 'done' } : s)) })
 
 test('a Normal run stops after Plan and before Commit, and goes on otherwise', () => {
   const run = newPipeline('r1', 't', 'feature', 'normal', null)

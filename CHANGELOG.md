@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1 (unreleased)
+
+- **Pipeline step agents:** each step runs with an agent suited to it
+  (researcher, planner, test-writer, a fixer for Build, reviewer, plain
+  Claude Code for Commit), not the agent in use at Start. A missing one falls
+  back to plain Claude Code and the step says so. The agent in use comes back
+  when the run ends.
+- Each step lists its agent; its **agent** chip picks another for this run.
+- **Preflight:** Start refuses a step whose agent lacks a permission it needs,
+  with **Use plain Claude Code for this step**.
+- **Blocked steps:** a step blocked by the limits, or Tests/Build changing
+  nothing, stops the run there with **Retry** and **Change agent**, instead
+  of moving on.
+
 ## 0.3.0 (unreleased)
 
 - **Skills tab:** every installed skill, grouped and searchable. Run one with

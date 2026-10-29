@@ -85,8 +85,13 @@ building on the last one's result, and it stops for your OK.
 | Big | Research → Plan → Tests → Build → Review → Commit | after Plan, before Commit |
 
 Each step runs in the chat as your own prompt, with that step's agent in use
-(planner or architect, test-writer, reviewer), so its limits hold. Build and
-Commit use the agent you had in use. Each answer is saved to
+(researcher, planner or architect, test-writer, reviewer), so its limits
+hold. Build uses the agent you had in use if it can edit and run, otherwise a
+fixer; Commit runs as plain Claude Code. Click a step's **agent** chip to pick
+another for this run. Start refuses a step whose agent lacks what it needs
+(with **Use plain Claude Code for this step**), and a step blocked by the
+limits, or that changed nothing when it should, stops with **Retry** and
+**Change agent**. Each answer is saved to
 `.deckhand/pipeline/<run>/` and the next step reads it. At a stop, click
 **Approve**, **Change** (type a note; the step runs again with it) or
 **Stop**.

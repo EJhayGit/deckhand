@@ -1,6 +1,8 @@
 // The Pipeline: a task through ordered steps, each building on the last one's
 // result, with stops for the owner's OK. Pure: no `$`.
-import type { PipeKind, PipeRun, PipeSize, PipeStep, PipeStepId } from '../types'
+import type { Limits, PipeKind, PipeRun, PipeShortfall, PipeSize, PipeStep, PipeStepId } from '../types'
+import { LIMIT_LABEL } from './limits'
+import type { Limit } from './limits'
 
 export const DIR = '.deckhand/pipeline'
 export const KEEP = 20
@@ -106,15 +108,81 @@ export function stepsFor(size: PipeSize): readonly PipeStepId[] {
   return STEPS[size]
 }
 
-// Build and Commit run in the main chat with the agent the owner had in use
-// (null: plain Claude Code). The rest use a deck agent.
-export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null): string | null {
-  if (step === 'research') return 'researcher'
-  if (step === 'plan') return size === 'big' ? 'architect' : 'planner'
-  if (step === 'tests') return 'test-writer'
-  if (step === 'review') return 'reviewer'
+// What each step's agent must be allowed to do. Plain Claude Code (null) can
+// do all of it.
+export const NEEDS: Record<PipeStepId, readonly Limit[]> = {
+  research: ['internet'],
+  plan: [],
+  tests: ['edit', 'run'],
+  build: ['edit', 'run'],
+  review: [],
+  commit: ['edit', 'run'],
+}
 
-  return owner
+// The deck's agents by name, with their limits.
+export type Installed = Readonly<Record<string, Limits>>
+
+// Build falls back to these, in order, when the agent in use can't edit and run.
+const FIXERS = ['fixer', 'bug-fixer']
+
+function can(limits: Limits | undefined, step: PipeStepId): boolean {
+  return limits !== undefined && NEEDS[step].every(l => limits[l])
+}
+
+// A step's default agent (null: plain Claude Code), with a note when the
+// default isn't installed. Build takes the agent in use if it can edit and
+// run, else a fixer; Commit is always plain Claude Code.
+export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null, installed: Installed): { agent: string | null; note?: string } {
+  if (step === 'commit') return { agent: null }
+  if (step === 'build') {
+    if (owner !== null && can(installed[owner], step)) return { agent: owner }
+    const fixer = FIXERS.find(name => can(installed[name], step))
+    return fixer ? { agent: fixer } : { agent: null, note: 'No fixer agent installed: plain Claude Code builds.' }
+  }
+  const want = step === 'research' ? 'researcher' : step === 'plan' ? (size === 'big' ? 'architect' : 'planner') : step === 'tests' ? 'test-writer' : 'reviewer'
+
+  return installed[want] ? { agent: want } : { agent: null, note: `No ${want} agent installed: plain Claude Code runs this step.` }
+}
+
+// Steps whose agent lacks a permission the step needs.
+export function preflight(steps: readonly PipeStep[], installed: Installed): PipeShortfall[] {
+  return steps.flatMap(s => {
+    if (s.agent === null) return []
+    const limits = installed[s.agent]
+    const missing = NEEDS[s.id].filter(l => limits?.[l] !== true)
+    return missing.length ? [{ step: s.id, agent: s.agent, missing }] : []
+  })
+}
+
+export function shortfallText(s: PipeShortfall): string {
+  return `${STEP_LABEL[s.step]}: ${s.agent} is missing ${s.missing.map(l => LIMIT_LABEL[l]).join(', ')}.`
+}
+
+// A picked agent for one step, for this run only.
+export function withAgent(run: PipeRun, step: PipeStepId, agent: string | null): PipeRun {
+  return { ...run, steps: run.steps.map(s => (s.id === step && s.status !== 'done' ? { ...s, agent, note: undefined } : s)) }
+}
+
+// The agent to put back when the run ends or stops.
+export function agentAfter(run: Pick<PipeRun, 'owner'>, installed: Installed): string | null {
+  return run.owner !== null && installed[run.owner] ? run.owner : null
+}
+
+// Steps that must change files: Tests (except a clean-up's) and Build.
+export function editsFiles(run: Pick<PipeRun, 'kind' | 'steps'>, index: number): boolean {
+  const id = run.steps[index]?.id
+  return id === 'build' || (id === 'tests' && run.kind !== 'cleanup')
+}
+
+// The limit guard's note, quoted in a step's answer, when it blocked a
+// permission the step needs. A read-only step trying to edit isn't blocked.
+export function blockedIn(answer: string, step: PipeStepId): string | undefined {
+  const hit = answer.match(/Blocked: [^\n]*?, but ([^\n]*?) is off for this agent\./)
+  return hit && stopsStep(step, (Object.keys(LIMIT_LABEL) as Limit[]).find(l => LIMIT_LABEL[l] === hit[1])) ? hit[0] : undefined
+}
+
+export function stopsStep(step: PipeStepId, limit: Limit | undefined): boolean {
+  return limit !== undefined && NEEDS[step].includes(limit)
 }
 
 export function runId(now: number): string {
@@ -125,8 +193,13 @@ export function fileOf(run: Pick<PipeRun, 'id' | 'steps'>, index: number): strin
   return `${DIR}/${run.id}/${String(index + 1).padStart(2, '0')}-${run.steps[index]!.id}.md`
 }
 
-export function newPipeline(id: string, task: string, kind: PipeKind, size: PipeSize, owner: string | null): PipeRun {
-  const steps: PipeStep[] = stepsFor(size).map(step => ({ id: step, agent: agentFor(step, size, owner), status: 'waiting' }))
+// `overrides`: agents picked per step (null: plain Claude Code).
+export function newPipeline(id: string, task: string, kind: PipeKind, size: PipeSize, owner: string | null, installed: Installed = {}, overrides: Partial<Record<PipeStepId, string | null>> = {}): PipeRun {
+  const steps: PipeStep[] = stepsFor(size).map(step => {
+    if (step in overrides) return { id: step, agent: overrides[step] ?? null, status: 'waiting' }
+    const { agent, note } = agentFor(step, size, owner, installed)
+    return { id: step, agent, status: 'waiting', ...(note ? { note } : {}) }
+  })
 
   return { id, task, kind, size, owner, steps, prompt: null }
 }
@@ -149,6 +222,8 @@ export type PipeEvent =
   | { kind: 'approve' }
   | { kind: 'change'; note: string }
   | { kind: 'redo'; from: PipeStepId; note: string }
+  | { kind: 'blocked'; reason: string }
+  | { kind: 'retry' }
   | { kind: 'stop' }
 
 // The run after an event, and the step to start next (none: wait or ended).
@@ -166,6 +241,15 @@ export function after(run: PipeRun, event: PipeEvent): { run: PipeRun; next: num
   if (event.kind === 'failed') {
     const i = at('running')
     return { run: { ...run, steps: i < 0 ? run.steps : set(i, { status: 'failed', error: event.error }), ended: 'failed', error: event.error }, next: null }
+  }
+  // Blocked: the run waits at that step for Retry, another agent, or Stop.
+  if (event.kind === 'blocked') {
+    const i = at('running')
+    return i < 0 ? { run, next: null } : { run: { ...run, steps: set(i, { status: 'blocked', error: event.reason }), blocked: undefined }, next: null }
+  }
+  if (event.kind === 'retry') {
+    const i = at('blocked')
+    return i < 0 ? { run, next: null } : { run: { ...run, steps: set(i, { status: 'waiting', error: undefined }) }, next: i }
   }
   if (event.kind === 'approve') {
     const i = at('gate')

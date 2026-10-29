@@ -15,7 +15,13 @@ async function toReview($: Engine, w: World, clock: { advance: (ms: number) => P
   await ui.press({ key: 'tab-swarm' })
   await ui.input({ key: 'swarm-task', text: 'Tidy the runner' })
   await ui.press({ key: 'size-tiny' })
+  // Build changes the files: git says something else before it than after.
+  const later = w.outputs
+  w.outputs = {}
+  w.stdout = 'before Build'
   await ui.press({ key: 'swarm-start' })
+  w.outputs = later
+  w.stdout = ''
   await $.turn.start({ turnId: 'b', text: w.submitted[0] } as never)
   await $.turn.complete(ends('Built it.'))
   await clock.advance(1)
@@ -77,6 +83,7 @@ test('reviewers fan out, duplicates merge, the skeptic confirms one, and Fix the
   expect(w.submitted[3]).toContain('Fix these review findings first:\n- src/run.ts:2 Command injection')
 
   // Build again, then Review again.
+  w.outputs['git diff HEAD'] = `${DIFF}+// fixed\n`
   await answer($, w, clock, 'Fixed.')
   expect(w.submitted[4]).toContain('step 2/3: Review')
   await answer($, w, clock, 'NO FINDINGS')

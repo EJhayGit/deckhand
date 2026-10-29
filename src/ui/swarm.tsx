@@ -3,22 +3,23 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import type { DeckAgent, PipeRun, PipeStep, Pipeline, SwarmDraft, SwarmMode } from '../../types'
-import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize } from '../pipeline'
-import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, startPipeline, stopPipeline } from '../pipelineRun'
+import type { DeckAgent, PipeRun, PipeStep, PipeStepId, Pipeline, SwarmDraft, SwarmMode } from '../../types'
+import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, shortfallText } from '../pipeline'
+import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline } from '../pipelineRun'
 import { PRESETS, startSwarm } from '../swarm'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
 const swarm = atom({ plugin: 'deckhand', key: 'swarm' } as const, { preset: 'launch-kit', picked: Object.keys(PRESETS[0]!.parts), mode: 'pipeline', task: '', note: null } as SwarmDraft)
 const pipeline = atom({ plugin: 'deckhand', key: 'pipeline' } as const, { kind: null, size: null, note: '', run: null, history: [] } as Pipeline)
+const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as string | null)
 
 const MODES: readonly { id: SwarmMode; label: string; hint: string }[] = [
   { id: 'pipeline', label: 'Pipeline', hint: 'Steps one after another, each building on the last, with stops for your OK.' },
   { id: 'parallel', label: 'Parallel', hint: 'Each picked agent starts now on its own part, in the background.' },
 ]
 
-const STATUS: Record<PipeStep['status'], string> = { waiting: 'waiting', running: 'running', done: 'done', gate: 'needs OK', failed: 'failed' }
-const STATUS_COLOR: Partial<Record<PipeStep['status'], string>> = { running: 'warning', done: 'success', gate: 'warning', failed: 'error' }
+const STATUS: Record<PipeStep['status'], string> = { waiting: 'waiting', running: 'running', done: 'done', gate: 'needs OK', failed: 'failed', blocked: 'blocked' }
+const STATUS_COLOR: Partial<Record<PipeStep['status'], string>> = { running: 'warning', done: 'success', gate: 'warning', failed: 'error', blocked: 'error' }
 const STEP_ICON: Record<PipeStep['id'], string> = { research: '🔭', plan: '🗺️', tests: '✅', build: '🛠️', review: '🔍', commit: '📦' }
 
 export async function renderSwarm($: EngineInterface, e: RenderInput) {
@@ -36,6 +37,8 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
   const mode: SwarmMode = s.mode === 'parallel' ? 'parallel' : 'pipeline'
   const size = p.size ?? guessSize(s.task).value
   const auto = autoText(s.task, p.kind, p.size)
+  const installed = Object.fromEntries(cards.map(c => [c.agent.name, c.agent.limits]))
+  const preview = newPipeline('preview', s.task, p.kind ?? guessKind(s.task).value, size, await read($, active), installed, p.agents ?? {})
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -44,7 +47,7 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
         {MODES.map(m => chip(`mode-${m.id}`, m.label, mode === m.id, () => set({ mode: m.id })))}
       </Box>
       <Text dimColor>{MODES.find(m => m.id === mode)?.hint}</Text>
-      {mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note)}
+      {mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note, cards, p.picking ?? null)}
       {!(mode === 'pipeline' && p.run) && (
         <Box flexDirection="column" gap={1}>
           {hasInput ? (
@@ -66,6 +69,19 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
               </Box>
               {auto && <Text key="pipeline-auto" color="success">{auto}</Text>}
               <Text dimColor>{gatesText(size)}</Text>
+              {preview.steps.map(step => (
+                <Box key={`plan-step-${step.id}`} flexDirection="column">
+                  {stepAgentRow($, e, step)}
+                  {step.note && <Text dimColor>{step.note}</Text>}
+                  {p.picking === step.id && renderPicker($, e, step.id, cards)}
+                </Box>
+              ))}
+              {(p.preflight ?? []).map(short => (
+                <Box key={`preflight-${short.step}`} flexDirection="row" gap={1} flexWrap="wrap">
+                  <Text color="error">{shortfallText(short)}</Text>
+                  <Button key={`preflight-plain-${short.step}`} label="Use plain Claude Code for this step" onPress={() => pickAgent($, short.step, null)} />
+                </Box>
+              ))}
             </Box>
           )}
           {mode === 'parallel' && (
@@ -95,13 +111,39 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
   )
 }
 
-function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: string) {
+// A step's agent, with the small chip that opens its picker.
+function stepAgentRow($: EngineInterface, e: RenderInput, step: PipeStep) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  return (
+    <Box flexDirection="row" gap={1}>
+      <Text>{STEP_ICON[step.id]} {STEP_LABEL[step.id]}</Text>
+      <Text dimColor>{step.agent ?? 'plain Claude Code'}</Text>
+      <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />
+    </Box>
+  )
+}
+
+// The deck's agents for one step, plus plain Claude Code.
+function renderPicker($: EngineInterface, e: RenderInput, step: PipeStepId, cards: DeckAgent[]) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  return (
+    <Box flexDirection="row" gap={1} flexWrap="wrap">
+      <Text dimColor>{STEP_LABEL[step]} with</Text>
+      <Button key="step-agent-none" label="Plain Claude Code" onPress={() => pickAgent($, step, null)} />
+      {cards.map(c => <Button key={`step-agent-${c.agent.name}`} label={c.agent.name} onPress={() => pickAgent($, step, c.agent.name)} />)}
+      <Button key="step-agent-cancel" label="Cancel" variant="secondary" dimColor onPress={() => pickStep($, undefined)} />
+    </Box>
+  )
+}
+
+function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: string, cards: DeckAgent[], picking: PipeStepId | null) {
   const elements = $.ui.resolve(e)
   const { Box, Text, Button } = elements
   const gate = run.steps.findIndex(s => s.status === 'gate')
   const kind = KINDS.find(k => k.id === run.kind)?.label
   const size = SIZES.find(z => z.id === run.size)?.label
   const hasConfirmed = run.steps[gate]?.id === 'review' && (run.findings ?? []).some(f => f.verdict === 'confirmed')
+  const blocked = run.steps.find(s => s.status === 'blocked')
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -110,9 +152,12 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
         <Box key={`step-${i}`} flexDirection="column" borderStyle="round" borderColor={step.status === 'gate' ? 'warning' : undefined} paddingX={1}>
           <Box flexDirection="row" gap={1}>
             <Text>{STEP_ICON[step.id]} {i + 1}. {STEP_LABEL[step.id]}</Text>
-            <Text dimColor>{step.agent ?? 'chat'}</Text>
+            <Text dimColor>{step.agent ?? 'plain Claude Code'}</Text>
             <Text color={STATUS_COLOR[step.status]}>{STATUS[step.status]}</Text>
+            {!run.ended && (step.status === 'waiting' || step.status === 'blocked') && <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />}
           </Box>
+          {step.note && <Text dimColor>{step.note}</Text>}
+          {!run.ended && picking === step.id && renderPicker($, e, step.id, cards)}
           {(step.status === 'done' || step.status === 'gate') && <Text dimColor>{fileOf(run, i)}</Text>}
           {step.status === 'gate' && step.id === 'plan' && run.sizeNote && <Text color="warning">{run.sizeNote}</Text>}
           {step.status === 'gate' && step.summary && <Text>{step.summary}</Text>}
@@ -130,7 +175,14 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
           </Box>
         </Box>
       )}
-      {gate < 0 && !run.ended && <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />}
+      {blocked && !run.ended && (
+        <Box flexDirection="row" gap={1}>
+          <Button key="pipeline-retry" label="Retry" variant="primary" onPress={() => retryPipeline($)} />
+          <Button key="pipeline-change-agent" label="Change agent" onPress={() => pickStep($, blocked.id)} />
+          <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />
+        </Box>
+      )}
+      {gate < 0 && !blocked && !run.ended && <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />}
       {run.ended && (
         <Box flexDirection="row" gap={1}>
           <Text color={run.ended === 'done' ? 'success' : run.ended === 'failed' ? 'error' : undefined}>

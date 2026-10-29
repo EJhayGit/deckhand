@@ -5,10 +5,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, TurnUsage } from 'claude-code'
 
-import type { DeckAgent, DeckTab, Finding, PipeKind, PipeRun, PipeSize, Pipeline, Run } from '../types'
+import type { DeckAgent, DeckTab, Finding, PipeKind, PipeRun, PipeSize, PipeStepId, Pipeline, Run } from '../types'
 import { applyVerdicts, changedFiles, fixNote, isSerious, mergeFindings, parseFindings, reportText, reviewPrompt, reviewersFor, skepticPrompt } from './findings'
-import { KEEP, STEP_LABEL, after, fileOf, newPipeline, planBump, runId, shortText, stepHead, stepPrompt } from './pipeline'
-import type { PipeEvent } from './pipeline'
+import { KEEP, STEP_LABEL, after, agentAfter, blockedIn, editsFiles, fileOf, newPipeline, planBump, preflight, runId, shortText, shortfallText, stepHead, stepPrompt, stopsStep, withAgent } from './pipeline'
+import type { Installed, PipeEvent } from './pipeline'
+import type { Limit } from './limits'
 import { addUsage, endRun, newRun } from './runs'
 import { useAgent, useNone } from './session'
 import { send } from './swarm'
@@ -24,8 +25,14 @@ export async function startPipeline($: EngineInterface, task: string, kind: Pipe
   if (task.trim() === '') return ['Type the task first.']
   const now = await read($, pipeline)
   if (now.run && !now.run.ended) return ['A pipeline is already running. Stop it first.']
-  const run = newPipeline(runId(await $.clock.now()), task.trim(), kind, size, await read($, active))
-  await update($, pipeline, p => ({ ...p, note: '', run, history: [run.id, ...p.history].slice(0, KEEP) }))
+  const installed = await installedOf($)
+  const run = newPipeline(runId(await $.clock.now()), task.trim(), kind, size, await read($, active), installed, now.agents ?? {})
+  const short = preflight(run.steps, installed)
+  if (short.length) {
+    await update($, pipeline, p => ({ ...p, preflight: short }))
+    return [`Can't start. ${short.map(shortfallText).join(' ')}`]
+  }
+  await update($, pipeline, p => ({ ...p, note: '', run, preflight: undefined, picking: null, history: [run.id, ...p.history].slice(0, KEEP) }))
   await update($, tab, () => 'swarm' as DeckTab)
   await startStep($, run, 0, false)
 
@@ -49,6 +56,11 @@ export async function onPipelineTurnEnd($: EngineInterface, prompt: string, reas
   }
   if (run.steps[i]!.id === 'review') {
     await onReviewEnd($, { ...run, prompt: null }, i, answer)
+    return
+  }
+  const blocked = run.blocked ?? blockedIn(answer, run.steps[i]!.id) ?? (await changedNothing($, run, i))
+  if (blocked) {
+    await apply($, { ...run, prompt: null }, { kind: 'blocked', reason: blocked })
     return
   }
   await $.fs.write(fileOf(run, i), answer)
@@ -77,12 +89,42 @@ export async function changePipeline($: EngineInterface, note: string): Promise<
   await event($, { kind: 'change', note: note.trim() })
 }
 
+export async function retryPipeline($: EngineInterface): Promise<void> {
+  await event($, { kind: 'retry' })
+}
+
+// Opens the agent picker for one step (undefined closes it).
+export async function pickStep($: EngineInterface, step: PipeStepId | undefined): Promise<void> {
+  await update($, pipeline, p => ({ ...p, picking: step ?? null }))
+}
+
+// An agent picked for a step, for this run only (null: plain Claude Code).
+export async function pickAgent($: EngineInterface, step: PipeStepId, agent: string | null): Promise<void> {
+  await update($, pipeline, p => ({
+    ...p,
+    agents: { ...p.agents, [step]: agent },
+    picking: null,
+    preflight: p.preflight?.filter(s => s.step !== step),
+    run: p.run && !p.run.ended ? withAgent(p.run, step, agent) : p.run,
+  }))
+}
+
+// The limit guard denied a main-chat tool call: the step in flight is blocked
+// when the step needs that permission.
+export async function onPipelineBlocked($: EngineInterface, note: string, limit: Limit): Promise<void> {
+  await update($, pipeline, p => {
+    const step = p.run?.steps.find(s => s.status === 'running')
+    if (!p.run || p.run.ended || p.run.prompt === null || p.run.blocked || !step || !stopsStep(step.id, limit)) return p
+    return { ...p, run: { ...p.run, blocked: note } }
+  })
+}
+
 export async function stopPipeline($: EngineInterface): Promise<void> {
   await event($, { kind: 'stop' })
 }
 
 export async function clearPipeline($: EngineInterface): Promise<void> {
-  await update($, pipeline, p => (p.run?.ended ? { ...p, run: null, note: '', kind: null, size: null } : p))
+  await update($, pipeline, p => (p.run?.ended ? { ...p, run: null, note: '', kind: null, size: null, agents: undefined, picking: null } : p))
 }
 
 async function event($: EngineInterface, e: PipeEvent) {
@@ -100,11 +142,13 @@ async function event($: EngineInterface, e: PipeEvent) {
 async function apply($: EngineInterface, run: PipeRun, e: PipeEvent, later = false) {
   const { run: next, next: index } = after(run, e)
   await update($, pipeline, p => ({ ...p, run: next, note: '' }))
+  const blocked = next.steps.find(s => s.status === 'blocked')
   if (index !== null) {
     await startStep($, next, index, later)
-  } else if (next.ended) {
+  } else if (next.ended || blocked) {
     await restore($, next)
     if (next.ended === 'failed') $.ui.toast(`Pipeline stopped: ${next.error ?? 'a step failed.'}`)
+    else if (!next.ended && blocked) $.ui.toast(`Pipeline blocked at ${STEP_LABEL[blocked.id]}: ${blocked.error}`)
   }
 }
 
@@ -120,7 +164,8 @@ async function startStep($: EngineInterface, run: PipeRun, index: number, later:
     await startReview($, run, index, later)
     return
   }
-  await submit($, run, index, stepPrompt(run, index), later)
+  const before = editsFiles(run, index) ? await filesState($) : undefined
+  await submit($, { ...run, before, blocked: undefined }, index, stepPrompt(run, index), later)
 }
 
 async function submit($: EngineInterface, run: PipeRun, index: number, prompt: string, later: boolean) {
@@ -204,7 +249,26 @@ async function git($: EngineInterface, argv: string[]): Promise<string | undefin
 }
 
 async function restore($: EngineInterface, run: PipeRun) {
-  if (run.owner === null || !(await useAgent($, run.owner))) await useNone($)
+  const name = agentAfter(run, await installedOf($))
+  if (name === null || !(await useAgent($, name))) await useNone($)
+}
+
+async function installedOf($: EngineInterface): Promise<Installed> {
+  return Object.fromEntries((await read($, deck)).map(c => [c.agent.name, c.agent.limits]))
+}
+
+// The working tree's state, to tell whether a step changed anything.
+async function filesState($: EngineInterface): Promise<string | undefined> {
+  const status = await git($, ['git', 'status', '--porcelain'])
+  const diff = await git($, ['git', 'diff', 'HEAD'])
+  return status === undefined || diff === undefined ? undefined : `${status}\n${diff}`
+}
+
+// shortcut: a step that only changes ignored files counts as changing nothing.
+async function changedNothing($: EngineInterface, run: PipeRun, index: number): Promise<string | undefined> {
+  if (run.before === undefined || !editsFiles(run, index)) return undefined
+  const now = await filesState($)
+  return now === run.before ? `${STEP_LABEL[run.steps[index]!.id]} changed no files.` : undefined
 }
 
 // A Runs row per step, tagged like `Pipeline 3/5 · Tests`.
