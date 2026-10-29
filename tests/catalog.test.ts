@@ -49,3 +49,34 @@ test('read-only built-ins say they change nothing', () => {
     expect(b.agent.body.toLowerCase()).toMatch(/change\s+nothing|write\s+no\s+code/)
   }
 })
+
+// Saved swarms and project overrides refer to these ids: they never change.
+const IDS = [
+  'reviewer', 'bug-fixer', 'test-runner', 'test-writer', 'docs-writer', 'planner', 'researcher', 'refactorer',
+  'architect', 'typescript-reviewer', 'frontend-designer', 'ui-critic', 'graphics-designer', 'security-auditor',
+  'dependency-auditor', 'change-security-review', 'website-reviewer', 'swarm-lead',
+]
+
+test('every earlier built-in id is still there, plus architect and typescript-reviewer', () => {
+  const ids = BUILTINS.map(b => b.id)
+  for (const id of IDS) expect(ids).toContain(id)
+})
+
+test('ECC agents keep the limit rules: reviewers and planners never edit, fixers edit and run, none go online', () => {
+  const limits = (id: string) => BUILTINS.find(b => b.id === id)!.agent.limits
+  for (const id of ['reviewer', 'typescript-reviewer', 'security-auditor', 'planner', 'architect']) {
+    expect(limits(id).edit).toBe(false)
+    expect(limits(id).internet).toBe(false)
+  }
+  for (const id of ['planner', 'architect']) expect(limits(id).run).toBe(false)
+  for (const id of ['bug-fixer', 'test-writer', 'refactorer']) expect(limits(id)).toEqual({ edit: true, run: true, internet: false })
+  expect(limits('docs-writer').internet).toBe(false)
+})
+
+test('ECC-adapted bodies stay under 150 lines and point at no ECC-only command or skill', () => {
+  for (const id of ['reviewer', 'planner', 'test-writer', 'security-auditor', 'refactorer', 'docs-writer', 'bug-fixer', 'architect', 'typescript-reviewer']) {
+    const body = BUILTINS.find(b => b.id === id)!.agent.body
+    expect(body.split('\n').length).toBeLessThanOrEqual(150)
+    expect(body).not.toMatch(/skill: |\/update-docs|\/update-codemaps|tdd-workflow|react-reviewer|Prompt Defense/)
+  }
+})

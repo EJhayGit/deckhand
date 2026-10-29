@@ -22,7 +22,7 @@ A **Deck** panel opens beside the chat.
 
 ## Use it
 
-1. The Deck already holds 16 ready agents (see below). To make your own, click
+1. The Deck already holds 18 ready agents (see below). To make your own, click
    **+ New**, type a name, pick what it starts from, and click **Save**. The
    agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
    it too.
@@ -36,11 +36,15 @@ A **Deck** panel opens beside the chat.
 
 | Group | Agents |
 | --- | --- |
-| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer |
+| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer, architect, typescript-reviewer |
 | Design | frontend-designer, ui-critic, graphics-designer |
 | Security | security-auditor, dependency-auditor, change-security-review |
 | Web | website-reviewer (give it a URL) |
 | Lead | swarm-lead |
+
+Built-in agents adapted from ECC by Affaan Mustafa: reviewer, planner,
+test-writer, security-auditor, refactorer, docs-writer, bug-fixer, architect
+and typescript-reviewer (MIT, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
 Click a group's name to fold it. A file in `.claude/agents/` with the same
 name replaces the built-in card.
@@ -175,4 +179,5 @@ the first time it loads the mod (see `docs/decisions/0001-hooks-import-and-turn-
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Third-party credits are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
