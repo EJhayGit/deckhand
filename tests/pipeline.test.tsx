@@ -51,7 +51,7 @@ test('a Normal Fix stops after Plan; Approve spawns Tests; each subagent\'s answ
   w.outputs['git status --porcelain'] = '?? auth.test.ts\n'
   await agentEnds($, w, clock, 'Added auth.test.ts; it fails.')
   expect(w.spawned).toHaveLength(3)
-  expect(w.spawned[2]!.subagentType).toBe('deckhand:bug-fixer')
+  expect(w.spawned[2]!.subagentType).toBe('deckhand:builder')
   expect(w.spawned[2]!.prompt).toContain('step 3/5: Build')
   expect(w.submitted).toEqual([])
 
@@ -145,7 +145,7 @@ test('Kind and Size start on Auto, and the reason line follows the task as it is
   await ui.unmount()
 })
 
-test('with researcher in use, Start spawns test-writer, which can edit; Build spawns the fixer; researcher stays in use', async ($, on) => {
+test('with researcher in use, Start spawns test-writer, which can edit; Build spawns the builder; researcher stays in use', async ($, on) => {
   const w = world(on)
   const clock = mock.clock(on)
   // Beneath the plugin, a tool call that gets through just succeeds.
@@ -158,7 +158,7 @@ test('with researcher in use, Start spawns test-writer, which can edit; Build sp
   await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
   await ui.press({ key: 'size-small' })
   expect(await ui.find({ type: 'Text', text: 'test-writer' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'bug-fixer' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'builder' })).toBeDefined()
   await ui.press({ key: 'swarm-start' })
   expect(w.spawned[0]!.subagentType).toBe('deckhand:test-writer')
   expect(w.spawned[0]!.prompt).toContain('step 1/4: Tests')
@@ -173,7 +173,7 @@ test('with researcher in use, Start spawns test-writer, which can edit; Build sp
 
   w.outputs['git status --porcelain'] = '?? a.test.ts\n'
   await agentEnds($, w, clock, 'Wrote a.test.ts.')
-  expect(w.spawned[1]!.subagentType).toBe('deckhand:bug-fixer')
+  expect(w.spawned[1]!.subagentType).toBe('deckhand:builder')
 
   await ui.press({ key: 'tab-deck' })
   expect(await ui.find({ type: 'Text', text: 'In use: researcher' })).toBeDefined()
@@ -271,7 +271,7 @@ test('a refused spawn blocks the step; Send through chat asks the chat to start 
   await $.turn.start({ turnId: 't', text: w.submitted[0] } as never)
   await $.turn.complete({ ...turnEnds(), answer: 'Wrote a.test.ts.' })
   await clock.advance(1)
-  expect(w.spawned[0]!.subagentType).toBe('deckhand:bug-fixer')
+  expect(w.spawned[0]!.subagentType).toBe('deckhand:builder')
   expect(w.spawned[0]!.prompt).toContain('step 2/4: Build')
   await ui.unmount()
 })

@@ -18,7 +18,7 @@ const running = (run: PipeRun, i: number): PipeRun => ({ ...run, steps: run.step
 
 const READ = { edit: false, run: false, internet: false }
 const BUILD = { edit: true, run: true, internet: false }
-const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD }
+const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD, builder: BUILD }
 
 test('each step has its default agent: architect plans Big, the agent in use builds, plain Claude Code commits', () => {
   const agents = (size: 'normal' | 'big') => newPipeline('x', 't', 'feature', size, 'fixer', DECK).steps.map(s => s.agent)
@@ -27,14 +27,14 @@ test('each step has its default agent: architect plans Big, the agent in use bui
   expect(newPipeline('x', 't', 'feature', 'tiny', null).steps[0]!.agent).toBeNull()
 })
 
-test('Build: the agent in use if it can edit and run, else fixer, else bug-fixer, else plain Claude Code', () => {
+test('Build: the agent in use if it can edit and run, else the builder, else plain Claude Code', () => {
   const tester = { ...DECK, mine: BUILD }
   expect(agentFor('build', 'small', 'mine', tester)).toEqual({ agent: 'mine' })
-  expect(agentFor('build', 'small', 'researcher', DECK)).toEqual({ agent: 'fixer' })
-  expect(agentFor('build', 'small', null, DECK)).toEqual({ agent: 'fixer' })
-  const { fixer: _, ...noFixer } = DECK
-  expect(agentFor('build', 'small', 'researcher', noFixer)).toEqual({ agent: 'bug-fixer' })
-  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher })).toEqual({ agent: null, note: 'No fixer agent installed: plain Claude Code builds.' })
+  expect(agentFor('build', 'small', 'researcher', DECK)).toEqual({ agent: 'builder' })
+  expect(agentFor('build', 'small', null, DECK)).toEqual({ agent: 'builder' })
+  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher, fixer: BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
+  // A bug fixer is not a builder: its instructions say no features.
+  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher, 'bug-fixer': BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
 })
 
 test('a missing default agent falls back to plain Claude Code and says so', () => {
@@ -45,7 +45,7 @@ test('a missing default agent falls back to plain Claude Code and says so', () =
 
 test('an override picks a step agent for this run; withAgent changes a waiting step only', () => {
   const run = newPipeline('x', 't', 'feature', 'normal', null, DECK, { tests: 'fixer', plan: null })
-  expect(run.steps.map(s => s.agent)).toEqual([null, 'fixer', 'fixer', 'reviewer', null])
+  expect(run.steps.map(s => s.agent)).toEqual([null, 'fixer', 'builder', 'reviewer', null])
   const done = { ...run, steps: run.steps.map((s, i) => (i === 0 ? { ...s, status: 'done' as const } : s)) }
   expect(withAgent(done, 'plan', 'architect').steps[0]!.agent).toBeNull()
   expect(withAgent(done, 'tests', 'test-writer').steps[1]!.agent).toBe('test-writer')

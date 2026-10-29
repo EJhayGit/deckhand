@@ -448,7 +448,7 @@ Change sends the plan back with your note. Fix these first sends confirmed revie
 - Research: `researcher` (read only, internet on).
 - Plan: `planner`, or `architect` for Big. Output is a numbered task list of thin slices.
 - Tests: `test-writer` (now ECC's tdd-guide).
-- Build: the main chat with the agent in use if it can edit and run, else `fixer` (or the built-in `bug-fixer`), else plain Claude Code.
+- Build: the agent in use if it can edit and run, else the built-in `builder`, else plain Claude Code. `bug-fixer` is not used: its instructions forbid adding features.
 - Review: `reviewer`, plus `security-auditor` on security triggers (Milestone 4).
 - Commit: the main chat as plain Claude Code, one commit per logical chunk.
 - Each step runs as a subagent Deckhand spawns itself (`$.agent.spawn`). Its answer is the step's result, the chat isn't typed into, and the agent in use isn't changed (`docs/decisions/0012-pipeline-subagents.md`).
@@ -512,5 +512,5 @@ The Review step runs several reviewers side by side, merges their duplicate find
 **Open questions for the owner**
 
 - [x] Keep Lead under "More", or remove it? Removed, with swarm-lead (2026-10-29).
-- [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else a fixer (2026-10-29).
+- [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else the builder (2026-10-29).
 - [ ] Any agent to add to or drop from the swap list in Milestone 2?

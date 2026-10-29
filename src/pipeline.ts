@@ -122,8 +122,8 @@ export const NEEDS: Record<PipeStepId, readonly Limit[]> = {
 // The deck's agents by name, with their limits.
 export type Installed = Readonly<Record<string, Limits>>
 
-// Build falls back to these, in order, when the agent in use can't edit and run.
-const FIXERS = ['fixer', 'bug-fixer']
+// Build falls back to the builder when the agent in use can't edit and run.
+const BUILDER = 'builder'
 
 function can(limits: Limits | undefined, step: PipeStepId): boolean {
   return limits !== undefined && NEEDS[step].every(l => limits[l])
@@ -131,13 +131,12 @@ function can(limits: Limits | undefined, step: PipeStepId): boolean {
 
 // A step's default agent (null: plain Claude Code), with a note when the
 // default isn't installed. Build takes the agent in use if it can edit and
-// run, else a fixer; Commit is always plain Claude Code.
+// run, else the builder; Commit is always plain Claude Code.
 export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null, installed: Installed): { agent: string | null; note?: string } {
   if (step === 'commit') return { agent: null }
   if (step === 'build') {
     if (owner !== null && can(installed[owner], step)) return { agent: owner }
-    const fixer = FIXERS.find(name => can(installed[name], step))
-    return fixer ? { agent: fixer } : { agent: null, note: 'No fixer agent installed: plain Claude Code builds.' }
+    return can(installed[BUILDER], step) ? { agent: BUILDER } : { agent: null, note: 'No builder agent installed: plain Claude Code builds.' }
   }
   const want = step === 'research' ? 'researcher' : step === 'plan' ? (size === 'big' ? 'architect' : 'planner') : step === 'tests' ? 'test-writer' : 'reviewer'
 
@@ -306,11 +305,13 @@ const DO: Record<PipeStepId, Record<PipeKind, string> | string> = {
     change: 'Write or update tests for the new behavior first. Run them: the new ones should fail until Build.',
     cleanup: 'Run the tests and note the result. Where coverage is thin, add tests that pin the current behavior. Everything must pass.',
   },
+  // Commit is its own step after Review and the owner's OK; a commit here would
+  // empty the diff Review reads.
   build: {
-    feature: 'Build it, slice by slice, until the tests pass. Run the tests.',
-    fix: 'Fix the root cause with the smallest change, so the failing test passes. Run the tests.',
-    change: 'Make the change, slice by slice, until the tests pass. Run the tests.',
-    cleanup: 'Clean up in small batches, running the tests after each. They must stay green.',
+    feature: 'Build it, slice by slice, until the tests pass. Run the tests. Don\'t commit: the Commit step does that.',
+    fix: 'Fix the root cause with the smallest change, so the failing test passes. Run the tests. Don\'t commit: the Commit step does that.',
+    change: 'Make the change, slice by slice, until the tests pass. Run the tests. Don\'t commit: the Commit step does that.',
+    cleanup: 'Clean up in small batches, running the tests after each. They must stay green. Don\'t commit: the Commit step does that.',
   },
   review: 'Review the change for real bugs and risks, most serious first. Change nothing.',
   commit: 'Commit the work: one commit per logical chunk, with plain messages. Don\'t push.',

@@ -36,7 +36,7 @@ A **Deck** panel opens beside the chat.
 
 | Group | Agents |
 | --- | --- |
-| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer, architect, typescript-reviewer, skeptic |
+| Core | reviewer, bug-fixer, builder, test-runner, test-writer, docs-writer, planner, researcher, refactorer, architect, typescript-reviewer, skeptic |
 | Design | frontend-designer, ui-critic, graphics-designer |
 | Security | security-auditor, dependency-auditor, change-security-review |
 | Web | website-reviewer (give it a URL) |
@@ -87,8 +87,8 @@ building on the last one's result, and it stops for your OK.
 Deckhand starts each step as its own subagent (researcher, planner or
 architect, test-writer, reviewer). Nothing is typed into your chat, and the
 agent you have in use stays as it is. Each subagent keeps its own limits, and
-the Runs tab shows it working. Build uses the agent you had in use if it can edit and run, otherwise a
-fixer; Commit runs as plain Claude Code. Click a step's **agent** chip to pick
+the Runs tab shows it working. Build uses the agent you had in use if it can edit and run, otherwise the
+builder; Commit runs as plain Claude Code. Click a step's **agent** chip to pick
 another for this run. Start refuses a step whose agent lacks what it needs
 (with **Use plain Claude Code for this step**), and a step blocked by the
 limits, or that changed nothing when it should, stops with **Retry** and

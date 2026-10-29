@@ -100,7 +100,7 @@ test('a review line that won\'t parse fails the step and says why', async ($, on
   const clock = mock.clock(on)
   const ui = await toReview($, w, clock)
 
-  expect(w.spawned.map(s => s.subagentType)).toEqual(['deckhand:bug-fixer', 'deckhand:reviewer'])
+  expect(w.spawned.map(s => s.subagentType)).toEqual(['deckhand:builder', 'deckhand:reviewer'])
   await ends($, clock, 2, `${finding({})}\nLooks fine to me!`)
 
   expect(w.spawned).toHaveLength(2)
