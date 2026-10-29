@@ -7,9 +7,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { DeckAgent, DeckTab, Finding, PipeKind, PipeRun, PipeSize, PipeStepId, Pipeline } from '../types'
-import { applyVerdicts, changedFiles, fixNote, isSerious, joinReviews, mergeFindings, parseFindings, reportText, reviewPrompt, reviewersFor, skepticPrompt } from './findings'
+import { applyVerdicts, brakeText, changedFiles, fixesText, isPicked, isSerious, joinReviews, mergeFindings, parseFindings, progress, reportText, reviewPrompt, reviewersFor, roundsCap, skepticPrompt, togglePick } from './findings'
 import { routeOf } from './models'
-import { KEEP, STEP_LABEL, after, blockedIn, chatPrompt, editsFiles, fileOf, newPipeline, planBump, preflight, runId, shortText, shortfallText, stepHead, stepPrompt, stopsStep, typeOf, withAgent } from './pipeline'
+import { KEEP, STEP_LABEL, after, blockedIn, chatPrompt, editsFiles, fileOf, fixesOf, newPipeline, planBump, preflight, runId, shortText, shortfallText, stepHead, stepPrompt, stopsStep, typeOf, withAgent } from './pipeline'
 import type { Installed, PipeEvent } from './pipeline'
 import type { Limit } from './limits'
 import { send } from './swarm'
@@ -26,9 +26,8 @@ export async function startPipeline($: EngineInterface, task: string, kind: Pipe
   if (now.run && !now.run.ended) return ['A pipeline is already running. Stop it first.']
   const cards = await read($, deck)
   const installed: Installed = Object.fromEntries(cards.map(c => [c.agent.name, c.agent.limits]))
-  const local = cards.filter(c => routeOf(c.agent.model).kind === 'local' || routeOf(c.agent.model).kind === 'codex').map(c => c.agent.name)
-  const run = newPipeline(runId(await $.clock.now()), task.trim(), kind, size, await read($, active), installed, now.agents ?? {})
-  const short = preflight(run.steps, installed, local)
+  const run = { ...newPipeline(runId(await $.clock.now()), task.trim(), kind, size, await read($, active), installed, now.agents ?? {}), cap: roundsCap(now.rounds) }
+  const short = preflight(run.steps, installed, localOf(cards))
   if (short.length) {
     await update($, pipeline, p => ({ ...p, preflight: short }))
     return [`Can't start. ${short.map(shortfallText).join(' ')}`]
@@ -63,7 +62,9 @@ export async function pipelineSpawnTitle($: EngineInterface, parentAgentId: stri
   const i = run.steps.findIndex(s => s.status === 'running')
   const who = run.steps[i]?.id === 'review' ? ` (${(subagentType ?? '').replace(/^deckhand:/, '')})` : ''
 
-  return `Pipeline ${i + 1}/${run.steps.length} · ${STEP_LABEL[run.steps[i]!.id]}${who}`
+  const at = run.round ? `Round ${run.round}/${run.cap ?? run.round}` : `Pipeline ${i + 1}/${run.steps.length}`
+
+  return `${at} · ${STEP_LABEL[run.steps[i]!.id]}${who}`
 }
 
 export async function onPipelineSpawn($: EngineInterface, agentId: string, parentAgentId: string | undefined, turnPrompt: string): Promise<void> {
@@ -90,12 +91,30 @@ export async function onPipelineTurnEnd($: EngineInterface, prompt: string, reas
   await concludeIfDone($, next)
 }
 
-// "Fix these first" at the Commit gate: Build again with the confirmed
-// findings, then Review again.
-export async function fixFirstPipeline($: EngineInterface): Promise<void> {
-  const run = (await read($, pipeline)).run
-  if (!run?.findings?.some(f => f.verdict === 'confirmed')) return
-  await event($, { kind: 'redo', from: 'build', note: fixNote(run.findings) })
+// Fix these at the Review gate (Change there too): the ticked findings and
+// the note go to Build, then Review reads the new diff. One round.
+export async function fixPipeline($: EngineInterface, note?: string): Promise<void> {
+  const p = await read($, pipeline)
+  const run = p.run
+  if (!run || run.ended || run.steps.find(s => s.status === 'gate')?.id !== 'review') return
+  const text = (note ?? p.note).trim()
+  if (!(run.findings ?? []).some(isPicked) && text === '') {
+    $.ui.toast('Tick a finding or type a note first.')
+    return
+  }
+  await fixRound($, run, text)
+}
+
+async function fixRound($: EngineInterface, run: PipeRun, note: string) {
+  const findings = run.findings ?? []
+  await $.fs.write(fixesOf(run), fixesText(findings, note))
+  // The tree before Build, so Review reads this round's change only.
+  const base = (await git($, ['git', 'stash', 'create']))?.trim()
+  await apply($, run, { kind: 'fix', previous: findings, base: base || 'HEAD' })
+}
+
+export async function toggleFinding($: EngineInterface, id: number): Promise<void> {
+  await update($, pipeline, p => (p.run?.findings ? { ...p, run: { ...p.run, findings: togglePick(p.run.findings, id) } } : p))
 }
 
 export async function approvePipeline($: EngineInterface): Promise<void> {
@@ -105,6 +124,11 @@ export async function approvePipeline($: EngineInterface): Promise<void> {
 export async function changePipeline($: EngineInterface, note: string): Promise<void> {
   if (note.trim() === '') {
     $.ui.toast('Type what to change first.')
+    return
+  }
+  const run = (await read($, pipeline)).run
+  if (run?.steps.find(s => s.status === 'gate')?.id === 'review') {
+    await fixPipeline($, note)
     return
   }
   await event($, { kind: 'change', note: note.trim() })
@@ -188,10 +212,20 @@ async function sendStep($: EngineInterface, run: PipeRun, index: number) {
       return
     }
     const agents = review.names.map(name => ({ name, type: typeOf(name, cardsOf(cards)) }))
-    prompt = reviewPrompt(stepHead(run, index), review.diffFile, review.untracked, agents)
+    prompt = reviewPrompt(stepHead(run, index), review.diffFile, review.untracked, agents, run.round ? fixesOf(run) : undefined)
   } else {
     if (step.agent !== null && !cards.some(c => c.agent.name === step.agent)) {
       await failAt($, run, index, `There is no ${step.agent} agent in the deck.`)
+      return
+    }
+    // Checked again here: an agent picked mid-run skipped Start's check.
+    const short = preflight([step], Object.fromEntries(cards.map(c => [c.agent.name, c.agent.limits])), localOf(cards))
+    if (short.length) {
+      await failAt($, run, index, `${shortfallText(short[0]!)} Pick an agent that can, then start again.`)
+      return
+    }
+    if (step.id === 'build' && run.round && !(await $.fs.exists(fixesOf(run)))) {
+      await failAt($, run, index, `The fixes file ${fixesOf(run)} is missing.`)
       return
     }
     prompt = chatPrompt(typeOf(step.agent, cardsOf(cards)), stepPrompt(run, index))
@@ -251,7 +285,7 @@ async function failAt($: EngineInterface, run: PipeRun, index: number, error: st
 // reviews. A string: why it can't run. Fails closed on no diff.
 async function reviewInputs($: EngineInterface, run: PipeRun, index: number): Promise<{ diffFile: string; untracked: string[]; names: string[] } | string> {
   const status = await git($, ['git', 'status', '--porcelain'])
-  const diff = await git($, ['git', 'diff', 'HEAD'])
+  const diff = await git($, ['git', 'diff', run.round ? (run.base ?? 'HEAD') : 'HEAD'])
   if (status === undefined || diff === undefined) return 'Couldn\'t read the diff with git.'
   const files = changedFiles(status)
   if (files.length === 0 && diff.trim() === '') return 'The diff is empty: nothing to review.'
@@ -293,12 +327,22 @@ async function finishReview($: EngineInterface, run: PipeRun, index: number, fin
   const text = reportText(findings)
   await $.fs.write(fileOf(run, index), text)
   const steps = run.steps.map((s, j) => (j === index ? { ...s, summary: shortText(text, 20) } : s))
-  await apply($, { ...run, steps, findings }, { kind: 'done', answer: text })
+  const cap = run.cap ?? roundsCap(undefined)
+  const next = run.round ? progress(run.previous ?? [], findings, run.round, cap) : undefined
+  await apply($, { ...run, steps, findings, brake: next && brakeText(next, run.round!, cap) }, { kind: 'done', answer: text })
+  if (next?.kind !== 'again') return
+  const now = (await read($, pipeline)).run
+  if (now && !now.ended) await fixRound($, now, '')
 }
 
 async function git($: EngineInterface, argv: string[]): Promise<string | undefined> {
   const ran = await $.process.run(argv).catch(() => undefined)
   return ran?.exitCode === 0 ? ran.stdout : undefined
+}
+
+// Agents on Local or Codex models: they answer only the main chat.
+function localOf(cards: readonly DeckAgent[]): string[] {
+  return cards.filter(c => routeOf(c.agent.model).kind === 'local' || routeOf(c.agent.model).kind === 'codex').map(c => c.agent.name)
 }
 
 function cardsOf(cards: readonly DeckAgent[]) {

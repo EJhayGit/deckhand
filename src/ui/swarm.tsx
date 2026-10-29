@@ -3,9 +3,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import type { DeckAgent, PipeRun, PipeStep, PipeStepId, Pipeline, SwarmDraft, SwarmMode } from '../../types'
-import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, shortfallText } from '../pipeline'
-import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline } from '../pipelineRun'
+import type { DeckAgent, PipeRun, PipeStep, PipeStepId, Pipeline, Run, SwarmDraft, SwarmMode } from '../../types'
+import { MAX_ROUNDS, MIN_ROUNDS, isPicked, roundsCap } from '../findings'
+import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, roundTotals, shortfallText } from '../pipeline'
+import { approvePipeline, changePipeline, clearPipeline, fixPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline, toggleFinding } from '../pipelineRun'
+import { costText, tokensText } from '../runs'
 import { PRESETS, startSwarm } from '../swarm'
 import { renderMiniCard } from './miniCard'
 
@@ -13,6 +15,7 @@ const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[
 const swarm = atom({ plugin: 'deckhand', key: 'swarm' } as const, { preset: 'launch-kit', picked: Object.keys(PRESETS[0]!.parts), mode: 'pipeline', task: '', note: null } as SwarmDraft)
 const pipeline = atom({ plugin: 'deckhand', key: 'pipeline' } as const, { kind: null, size: null, note: '', run: null, history: [] } as Pipeline)
 const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as string | null)
+const runs = atom({ plugin: 'deckhand', key: 'runs' } as const, [] as Run[])
 
 const MODES: readonly { id: SwarmMode; label: string; hint: string }[] = [
   { id: 'pipeline', label: 'Pipeline', hint: 'Steps one after another, each building on the last, with stops for your OK.' },
@@ -50,7 +53,7 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
         {MODES.map(m => chip(`mode-${m.id}`, m.label, mode === m.id, () => set({ mode: m.id })))}
       </Box>
       <Text dimColor>{MODES.find(m => m.id === mode)?.hint}</Text>
-      {mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note, cards, p.picking ?? null)}
+      {mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note, cards, p.picking ?? null, await read($, runs))}
       {!(mode === 'pipeline' && p.run) && (
         <Box flexDirection="column" gap={1}>
           {hasInput ? (
@@ -69,6 +72,10 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
                 <Text dimColor>Size</Text>
                 {chip('size-auto', 'Auto', p.size === null, () => update($, pipeline, now => ({ ...now, size: null })))}
                 {SIZES.map(z => chip(`size-${z.id}`, z.label, p.size === z.id, () => update($, pipeline, now => ({ ...now, size: z.id }))))}
+              </Box>
+              <Box flexDirection="row" gap={1} flexWrap="wrap">
+                <Text dimColor>Max rounds</Text>
+                {Array.from({ length: MAX_ROUNDS - MIN_ROUNDS + 1 }, (_, i) => MIN_ROUNDS + i).map(n => chip(`rounds-${n}`, String(n), roundsCap(p.rounds) === n, () => update($, pipeline, now => ({ ...now, rounds: n }))))}
               </Box>
               {auto && <Text key="pipeline-auto" color="success">{auto}</Text>}
               <Text dimColor>{gatesText(size)}</Text>
@@ -111,7 +118,7 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
 }
 
 // Steps as a wrapping row of small cards; the current one has a bold border.
-function renderTrack($: EngineInterface, e: RenderInput, steps: PipeStep[], run: PipeRun | undefined, canPick: boolean) {
+function renderTrack($: EngineInterface, e: RenderInput, steps: PipeStep[], run: PipeRun | undefined, canPick: boolean, rows: readonly Run[] = []) {
   const { Box, Text, Button } = $.ui.resolve(e)
 
   return (
@@ -125,6 +132,7 @@ function renderTrack($: EngineInterface, e: RenderInput, steps: PipeStep[], run:
             <Text dimColor wrap="truncate-end">{step.agent ?? 'plain Claude Code'}</Text>
             <Text color={STATUS_COLOR[step.status]}>{STATUS_TEXT[step.status]}</Text>
             {step.status === 'gate' && <Text color="warning">{STATUS[step.status]}</Text>}
+            {run && roundTotals(rows, run, step.id).filter(r => r.tokens > 0).map(r => <Text key={`round-${step.id}-${r.round}`} dimColor wrap="truncate-end">R{r.round} {tokensText(r.tokens)} · {costText(r.cost)}</Text>)}
             {canPick && (!run || step.status === 'waiting' || step.status === 'blocked') && <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />}
           </Box>
         )
@@ -146,13 +154,14 @@ function renderPicker($: EngineInterface, e: RenderInput, step: PipeStepId, card
   )
 }
 
-function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: string, cards: DeckAgent[], picking: PipeStepId | null) {
+function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: string, cards: DeckAgent[], picking: PipeStepId | null, rows: readonly Run[]) {
   const elements = $.ui.resolve(e)
   const { Box, Text, Button } = elements
   const gate = run.steps.findIndex(s => s.status === 'gate')
   const kind = KINDS.find(k => k.id === run.kind)?.label
   const size = SIZES.find(z => z.id === run.size)?.label
-  const hasConfirmed = run.steps[gate]?.id === 'review' && (run.findings ?? []).some(f => f.verdict === 'confirmed')
+  const isReview = run.steps[gate]?.id === 'review'
+  const hasPicked = isReview && (run.findings ?? []).some(isPicked)
   const blocked = run.steps.find(s => s.status === 'blocked')
   const current = run.steps.findIndex(s => ['running', 'gate', 'blocked', 'failed'].includes(s.status))
   // The picker closes once its step has started.
@@ -161,7 +170,7 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
   return (
     <Box flexDirection="column" gap={1}>
       <Text bold wrap="truncate-end">{kind} · {size} · {run.task}</Text>
-      {renderTrack($, e, run.steps, run, !run.ended)}
+      {renderTrack($, e, run.steps, run, !run.ended, rows)}
       {run.steps.filter(step => step.note).map(step => <Text key={`note-${step.id}`} dimColor>{step.note}</Text>)}
       {!run.ended && picking && isPickable && renderPicker($, e, picking, cards)}
       {run.steps.map((step, i) => (step.status === 'done' || step.status === 'gate') && <Text key={`file-${step.id}`} dimColor>{fileOf(run, i)}</Text>)}
@@ -175,11 +184,19 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
       )}
       {gate >= 0 && !run.ended && (
         <Box flexDirection="column" gap={1}>
-          {'Input' in elements && <elements.Input key="pipeline-note" label="Change (optional)" placeholder="what to do differently" value={note} onInput={v => update($, pipeline, p => ({ ...p, note: v }))} onSubmit={v => update($, pipeline, p => ({ ...p, note: v }))} />}
+          {isReview && run.round && <Text dimColor>Fix round {run.round}/{run.cap ?? run.round} done.</Text>}
+          {isReview && run.brake && <Text color="warning">{run.brake}</Text>}
+          {isReview && (run.findings ?? []).map(f => (
+            <Box key={`finding-${f.id}`} flexDirection="row" gap={1}>
+              <Button key={`finding-pick-${f.id}`} label={isPicked(f) ? '☑' : '☐'} variant="secondary" dimColor={!isPicked(f)} onPress={() => toggleFinding($, f.id)} />
+              <Text wrap="truncate-end" dimColor={f.verdict === 'refuted'}>[{f.severity}] {f.file}:{f.line} {f.title}{f.verdict === 'refuted' ? ' (refuted)' : ''}</Text>
+            </Box>
+          ))}
+          {'Input' in elements && <elements.Input key="pipeline-note" label={isReview ? 'Note for Build (optional)' : 'Change (optional)'} placeholder="what to do differently" value={note} onInput={v => update($, pipeline, p => ({ ...p, note: v }))} onSubmit={v => update($, pipeline, p => ({ ...p, note: v }))} />}
           <Box flexDirection="row" gap={1}>
-            {hasConfirmed && <Button key="pipeline-fix" label="Fix these first" variant="primary" onPress={() => fixFirstPipeline($)} />}
-            <Button key="pipeline-approve" label="Approve" variant={hasConfirmed ? 'secondary' : 'primary'} onPress={() => approvePipeline($)} />
-            <Button key="pipeline-change" label="Change" onPress={() => changePipeline($, note)} />
+            {isReview && <Button key="pipeline-fix" label="Fix these" variant={hasPicked ? 'primary' : 'secondary'} onPress={() => fixPipeline($, note)} />}
+            <Button key="pipeline-approve" label="Approve" variant={hasPicked ? 'secondary' : 'primary'} onPress={() => approvePipeline($)} />
+            {!isReview && <Button key="pipeline-change" label="Change" onPress={() => changePipeline($, note)} />}
             <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />
           </Box>
         </Box>

@@ -96,8 +96,10 @@ reviewer, committer). The chat waits for that agent to finish, and Deckhand
 saves **the agent's own answer** as the step's result; the chat's reply is
 never used. Only then does the next step go in. The agent you have in use
 stays as it is. Each step's agent keeps its own limits, and the Runs tab shows
-it working. Build uses the agent you had in use if it can edit and run,
-otherwise the builder; Commit uses the committer. Click a step's **agent**
+it working. Every step runs on its own agent, never the one you have in use:
+Build uses the builder (the bug-fixer for a Fix); Commit uses the committer.
+A step whose agent can't edit or run commands when it must fails with a note
+saying so. Click a step's **agent**
 chip to pick another for this run. Start refuses a step whose agent lacks what
 it needs (with **Use plain Claude Code for this step**), and a step blocked by
 the limits, that changed nothing when it should, or whose chat turn started no
@@ -109,8 +111,18 @@ agent, stops with **Retry** and **Change agent**. Each answer is saved to
 **Review** starts reviewer, plus typescript-reviewer for TypeScript and
 security-auditor for security-sensitive changes, merges their duplicate
 findings, and has the skeptic agent re-check every serious one. Only findings
-it proves stay; medium and low ones show as advice. If any are confirmed,
-**Fix these first** sends Build back with them, then Review again.
+it proves stay; medium and low ones show as advice.
+
+At the Review stop each finding has a checkbox: medium and up are ticked,
+low and refuted ones aren't. **Fix these** writes the ticked ones and your
+note to `.deckhand/pipeline/<run>/<nn>-fixes.md`, runs Build on just those,
+then reviews that round's change. That's one round; rounds go on by
+themselves until the review is clean (back to the stop, then **Approve**),
+or a brake stops them with the reason: **Max rounds** (chip, 1 to 5,
+default 3), **no progress** (the same findings back, or no fewer), or
+**rising** (more new findings than fixed, with both lists). Each round's
+agents show in Runs as `Round 2/3 · Build`, and the step cards show each
+round's tokens and cost.
 
 ### Parallel
 

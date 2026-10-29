@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { NONE, applyVerdicts, changedFiles, joinReviews, mergeFindings, parseFindings, reportText, reviewPrompt, reviewersFor, securityTrigger } from '../src/findings'
+import { NONE, applyVerdicts, brakeText, changedFiles, fixesText, isPicked, joinReviews, keyOf, mergeFindings, parseFindings, progress, reportText, reviewPrompt, reviewersFor, roundsCap, securityTrigger, togglePick } from '../src/findings'
+import type { Finding } from '../types'
 
 const line = (o: Record<string, unknown>) => JSON.stringify({ severity: 'high', file: 'src/a.ts', line: 3, title: 'Bug', evidence: 'x = y', reviewer: 'reviewer', ...o })
 
@@ -84,4 +85,41 @@ test('the review prompt starts each reviewer in the foreground; their answers jo
   expect(joinReviews([NONE, line({}), ' no findings '])).toBe(line({}))
   expect(joinReviews([NONE, NONE])).toBe(NONE)
   expect(parseFindings(joinReviews([line({}), line({ evidence: 'z' })]))).toHaveLength(2)
+})
+
+const f = (id: number, severity: Finding['severity'], evidence: string, extra: Partial<Finding> = {}): Finding =>
+  ({ id, severity, file: 'src/a.ts', line: id, title: `T${id}`, evidence, reviewers: ['reviewer'], verdict: severity === 'low' || severity === 'medium' ? 'advice' : 'confirmed', ...extra })
+
+test('fix picks: medium and up are ticked, low and refuted are not, and a toggle wins', () => {
+  const all = [f(1, 'critical', 'a'), f(2, 'high', 'b', { verdict: 'refuted' }), f(3, 'medium', 'c'), f(4, 'low', 'd')]
+  expect(all.map(isPicked)).toEqual([true, false, true, false])
+  const toggled = togglePick(togglePick(all, 1), 4)
+  expect(toggled.map(isPicked)).toEqual([false, false, true, true])
+  const text = fixesText(toggled, ' keep it small ')
+  expect(text).toContain('[medium] src/a.ts:3 T3')
+  expect(text).toContain('[low] src/a.ts:4 T4')
+  expect(text).not.toContain('T1')
+  expect(text).toContain('## Owner\'s note\n\nkeep it small')
+})
+
+test('progress: clean, again, the same back, no drop, rising, and the cap', () => {
+  const prev = [f(1, 'medium', 'a'), f(2, 'medium', 'b')]
+  expect(progress(prev, [], 1, 3)).toEqual({ kind: 'clean' })
+  expect(progress(prev, [f(9, 'low', 'z')], 1, 3)).toEqual({ kind: 'clean' })
+  expect(progress(prev, [f(1, 'medium', 'a')], 1, 3)).toEqual({ kind: 'again' })
+  expect(progress(prev, [f(1, 'medium', 'a')], 3, 3)).toEqual({ kind: 'cap' })
+  expect(progress(prev, [f(7, 'high', ' a '), f(8, 'medium', 'b')], 1, 3)).toEqual({ kind: 'stuck', reason: 'the same findings came back' })
+  // One fixed, one new: no rise, but the count didn't drop.
+  expect(progress(prev, [f(1, 'medium', 'a'), f(3, 'medium', 'c')], 1, 3)).toEqual({ kind: 'stuck', reason: 'the count didn\'t drop (2 sent, 2 back)' })
+  const rising = progress([f(1, 'medium', 'a')], [f(2, 'medium', 'b'), f(3, 'medium', 'c')], 1, 3)
+  expect(rising.kind).toBe('rising')
+  expect(brakeText(rising, 1, 3)).toContain('rising, 2 new findings and 1 fixed')
+  expect(brakeText({ kind: 'again' }, 1, 3)).toBeUndefined()
+  // Same file and code, spacing aside, is the same finding; another file isn't.
+  expect(keyOf(f(1, 'low', 'a  b'))).toBe(keyOf({ file: 'src/a.ts', evidence: 'a b' }))
+  expect(keyOf({ file: 'src/b.ts', evidence: 'a b' })).not.toBe(keyOf({ file: 'src/a.ts', evidence: 'a b' }))
+})
+
+test('the round cap is 3 by default, 1 to 5', () => {
+  expect([undefined, 0, 1, 4, 9].map(roundsCap)).toEqual([3, 1, 1, 4, 5])
 })

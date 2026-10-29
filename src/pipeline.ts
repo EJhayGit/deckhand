@@ -1,6 +1,6 @@
 // The Pipeline: a task through ordered steps, each building on the last one's
 // result, with stops for the owner's OK. Pure: no `$`.
-import type { Limits, PipeKind, PipeRun, PipeShortfall, PipeSize, PipeStep, PipeStepId } from '../types'
+import type { Finding, Limits, PipeKind, PipeRun, PipeShortfall, PipeSize, PipeStep, PipeStepId, Run } from '../types'
 import { LIMIT_LABEL } from './limits'
 import type { Limit } from './limits'
 
@@ -122,8 +122,9 @@ export const NEEDS: Record<PipeStepId, readonly Limit[]> = {
 // The deck's agents by name, with their limits.
 export type Installed = Readonly<Record<string, Limits>>
 
-// Build falls back to the builder when the agent in use can't edit and run.
+// Each step has its own agent; the agent in use never runs a step.
 const BUILDER = 'builder'
+const BUG_FIXER = 'bug-fixer'
 const COMMITTER = 'committer'
 
 function can(limits: Limits | undefined, step: PipeStepId): boolean {
@@ -131,12 +132,12 @@ function can(limits: Limits | undefined, step: PipeStepId): boolean {
 }
 
 // A step's default agent (null: plain Claude Code), with a note when the
-// default isn't installed. Build takes the agent in use if it can edit and
-// run, else the builder; Commit takes the committer.
-export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null, installed: Installed): { agent: string | null; note?: string } {
+// default isn't installed. Build takes the builder (the bug-fixer for a Fix);
+// Commit takes the committer.
+export function agentFor(step: PipeStepId, size: PipeSize, kind: PipeKind, installed: Installed): { agent: string | null; note?: string } {
   if (step === 'commit') return can(installed[COMMITTER], step) ? { agent: COMMITTER } : { agent: null, note: 'No committer agent installed: plain Claude Code commits.' }
   if (step === 'build') {
-    if (owner !== null && can(installed[owner], step)) return { agent: owner }
+    if (kind === 'fix' && can(installed[BUG_FIXER], step)) return { agent: BUG_FIXER }
     return can(installed[BUILDER], step) ? { agent: BUILDER } : { agent: null, note: 'No builder agent installed: plain Claude Code builds.' }
   }
   const want = step === 'research' ? 'researcher' : step === 'plan' ? (size === 'big' ? 'architect' : 'planner') : step === 'tests' ? 'test-writer' : 'reviewer'
@@ -174,12 +175,14 @@ export function typeOf(agent: string | null, cards: readonly { name: string; age
   return cards.find(c => c.name === agent)?.agentType ?? `deckhand:${agent}`
 }
 
-// A step as sent to the chat: start the step's agent and wait for it.
-// Deckhand reads the agent's own answer, so the chat only says Done.
+// A step as sent to the chat: start the step's agent and wait for it. The
+// agent is named first, so auto mode sees the start was asked for. Deckhand
+// reads the agent's own answer, so the chat only says Done.
 export function chatPrompt(type: string, body: string): string {
-  return `Start the \`${type}\` agent now with one Agent call (subagent_type \`${type}\`), not in
-the background, giving it the instructions below exactly. Do none of the work
-yourself. When it has finished, reply only: Done. Deckhand reads its answer itself.
+  return `Start the \`${type}\` agent to run this Deckhand Pipeline step: one Agent call
+(subagent_type \`${type}\`), not in the background, giving it the instructions
+below exactly. Do none of the work yourself. When it has finished, reply
+only: Done. Deckhand reads its answer itself.
 
 ${body}`
 }
@@ -205,6 +208,12 @@ export function runId(now: number): string {
   return new Date(now).toISOString().replace(/\.\d+Z$/, '').replace(/[-:]/g, '').replace('T', '-')
 }
 
+// The findings a fix round's Build reads, beside Build's own result.
+export function fixesOf(run: Pick<PipeRun, 'id' | 'steps'>): string {
+  const build = run.steps.findIndex(s => s.id === 'build')
+  return `${DIR}/${run.id}/${String(build + 1).padStart(2, '0')}-fixes.md`
+}
+
 export function fileOf(run: Pick<PipeRun, 'id' | 'steps'>, index: number): string {
   return `${DIR}/${run.id}/${String(index + 1).padStart(2, '0')}-${run.steps[index]!.id}.md`
 }
@@ -213,7 +222,7 @@ export function fileOf(run: Pick<PipeRun, 'id' | 'steps'>, index: number): strin
 export function newPipeline(id: string, task: string, kind: PipeKind, size: PipeSize, owner: string | null, installed: Installed = {}, overrides: Partial<Record<PipeStepId, string | null>> = {}): PipeRun {
   const steps: PipeStep[] = stepsFor(size).map(step => {
     if (step in overrides) return { id: step, agent: overrides[step] ?? null, status: 'waiting' }
-    const { agent, note } = agentFor(step, size, owner, installed)
+    const { agent, note } = agentFor(step, size, kind, installed)
     return { id: step, agent, status: 'waiting', ...(note ? { note } : {}) }
   })
 
@@ -237,7 +246,7 @@ export type PipeEvent =
   | { kind: 'failed'; error: string }
   | { kind: 'approve' }
   | { kind: 'change'; note: string }
-  | { kind: 'redo'; from: PipeStepId; note: string }
+  | { kind: 'fix'; previous: Finding[]; base?: string }
   | { kind: 'blocked'; reason: string }
   | { kind: 'retry' }
   | { kind: 'stop' }
@@ -275,11 +284,13 @@ export function after(run: PipeRun, event: PipeEvent): { run: PipeRun; next: num
     const i = at('gate')
     return i < 0 ? { run, next: null } : { run: { ...run, steps: set(i, { status: 'waiting' }), note: event.note }, next: i }
   }
-  if (event.kind === 'redo') {
-    const from = run.steps.findIndex(s => s.id === event.from)
-    if (from < 0 || at('gate') < 0) return { run, next: null }
+  // One fix round: Build again on the fixes file, then Review the new diff.
+  if (event.kind === 'fix') {
+    const from = run.steps.findIndex(s => s.id === 'build')
+    const gate = at('gate')
+    if (from < 0 || gate < 0 || run.steps[gate]!.id !== 'review') return { run, next: null }
     const steps = run.steps.map((s, j) => (j >= from ? { ...s, status: 'waiting' as const, summary: undefined } : s))
-    return { run: { ...run, steps, note: event.note, findings: undefined }, next: from }
+    return { run: { ...run, steps, note: undefined, findings: undefined, brake: undefined, previous: event.previous, base: event.base, round: (run.round ?? 0) + 1 }, next: from }
   }
 
   return { run: { ...run, ended: 'stopped' }, next: null }
@@ -329,6 +340,16 @@ export function stepPrompt(run: PipeRun, index: number): string {
   const step = run.steps[index]!
   const earlier = run.steps.slice(0, index).map((s, i) => (s.status === 'done' ? `- ${fileOf(run, i)}` : '')).filter(Boolean)
   const todo = typeof DO[step.id] === 'string' ? DO[step.id] as string : (DO[step.id] as Record<PipeKind, string>)[run.kind]
+  if (step.id === 'build' && run.round) {
+    return `${stepHead(run, index)}
+
+Fix round ${run.round}/${run.cap ?? run.round}. Read ${fixesOf(run)} and fix only the items in it,
+with the smallest change. Run the tests. Don't commit: the Commit step does that.
+
+Do only this step. Your final answer is the step's result: Deckhand saves it
+to ${fileOf(run, index)} for the next step.
+`
+  }
   const note = run.note ? `\n\nThe owner asked for a change: ${run.note}\nRedo this step with it.` : ''
 
   return `${stepHead(run, index)}
@@ -346,4 +367,15 @@ to ${fileOf(run, index)} for the next step.
 export function shortText(text: string, lines = 12): string {
   const all = text.trim().split(/\r?\n/)
   return all.length > lines ? `${all.slice(0, lines).join('\n')}\n…` : all.join('\n')
+}
+
+// Tokens and cost per fix round of one step, from the Runs rows tagged like
+// `Round 2/3 · Build`. Rows from before this run started don't count.
+export function roundTotals(rows: readonly Pick<Run, 'title' | 'tokens' | 'cost' | 'startedAt'>[], run: Pick<PipeRun, 'id' | 'round'>, step: PipeStepId): { round: number; tokens: number; cost: number }[] {
+  const m = /^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)$/.exec(run.id)
+  const since = m ? Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!) : 0
+  return Array.from({ length: run.round ?? 0 }, (_, i) => {
+    const of = rows.filter(r => r.startedAt >= since && r.title.startsWith(`Round ${i + 1}/`) && r.title.includes(`· ${STEP_LABEL[step]}`))
+    return { round: i + 1, tokens: of.reduce((n, r) => n + r.tokens, 0), cost: of.reduce((n, r) => n + r.cost, 0) }
+  })
 }

@@ -93,6 +93,15 @@ export type PipeRun = {
   agentIds?: string[]
   spawning?: boolean
   answers?: Record<string, { reason: string; answer: string }>
+  // The fix loop: the round in flight or last run (none before the first Fix
+  // these), the cap, the review sent to Build with its ticks, why a brake
+  // stopped the loop, and the tree before this round's Build (`git stash
+  // create`; empty: HEAD) so Review reads the new diff only.
+  round?: number
+  cap?: number
+  previous?: Finding[]
+  brake?: string
+  base?: string
 }
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
@@ -107,6 +116,8 @@ export type Finding = {
   reviewers: string[]
   verdict: 'pending' | 'confirmed' | 'refuted' | 'advice'
   proof?: string
+  // The owner's tick at the Review gate; unset: picksByDefault.
+  pick?: boolean
 }
 // The Pipeline's choices (null: Auto, guessed from the task), the run, and the last
 // run ids (the folders under .deckhand/pipeline/). `agents`: picked per step
@@ -121,6 +132,8 @@ export type Pipeline = {
   agents?: Partial<Record<PipeStepId, string | null>>
   picking?: PipeStepId | null
   preflight?: PipeShortfall[]
+  // The Max rounds chip for the next run's fix loop (unset: 3).
+  rounds?: number
 }
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 

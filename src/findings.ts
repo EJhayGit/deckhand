@@ -110,13 +110,17 @@ export function applyVerdicts(findings: readonly Finding[], text: string): Findi
 
 export const FINDING_FORMAT = `{"severity":"high","file":"src/a.ts","line":12,"title":"Token logged in plain text","evidence":"console.log(token)","reviewer":"reviewer"}`
 
-export function reviewPrompt(head: string, diffFile: string, untracked: readonly string[], agents: readonly { name: string; type: string }[]): string {
+// `fixes`: in a fix round, the file Build fixed from; the diff is that round's only.
+export function reviewPrompt(head: string, diffFile: string, untracked: readonly string[], agents: readonly { name: string; type: string }[], fixes?: string): string {
   const list = agents.map((a, i) => `${i + 1}. \`${a.type}\` (reviewer name: ${a.name})`).join('\n')
   const extra = untracked.length ? `\nNew files not in the diff (read them too): ${untracked.join(', ')}` : ''
+  const round = fixes ? `\nThis diff is a fix round's change only. Also check each item in ${fixes} and report it again if it is still there.` : ''
 
-  return `${head}
+  return `Start the ${agents.map(a => `\`${a.type}\``).join(', ')} agent${agents.length === 1 ? '' : 's'} to review this Deckhand Pipeline step.
 
-Review the change in ${diffFile}.${extra}
+${head}
+
+Review the change in ${diffFile}.${extra}${round}
 
 Start every reviewer below now, in one message: one Agent call each, with that
 subagent_type, not in the background. Tell each to read the diff file and the
@@ -170,6 +174,72 @@ export function reportText(findings: readonly Finding[]): string {
   ].filter(Boolean).join('\n')
 }
 
-export function fixNote(findings: readonly Finding[]): string {
-  return `Fix these review findings first:\n${findings.filter(f => f.verdict === 'confirmed').map(f => `- ${f.file}:${f.line} ${f.title}`).join('\n')}`
+// The fix loop. Ticked by default: medium and up that the skeptic didn't refute.
+export function picksByDefault(f: Finding): boolean {
+  return f.severity !== 'low' && f.verdict !== 'refuted'
+}
+
+export function isPicked(f: Finding): boolean {
+  return f.pick ?? picksByDefault(f)
+}
+
+export function togglePick(findings: readonly Finding[], id: number): Finding[] {
+  return findings.map(f => (f.id === id ? { ...f, pick: !isPicked(f) } : f))
+}
+
+// Same finding across rounds: same file, same code.
+export function keyOf(f: Pick<Finding, 'file' | 'evidence'>): string {
+  return `${f.file}\n${normalize(f.evidence)}`
+}
+
+export const MIN_ROUNDS = 1
+export const MAX_ROUNDS = 5
+export const ROUNDS = 3
+
+export function roundsCap(n: number | undefined): number {
+  return Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, Math.round(n ?? ROUNDS)))
+}
+
+export type Progress =
+  | { kind: 'clean' }
+  | { kind: 'again' }
+  | { kind: 'stuck'; reason: string }
+  | { kind: 'rising'; added: Finding[]; fixed: Finding[] }
+  | { kind: 'cap' }
+
+// After a round: `previous` is the last review with the owner's ticks, `now`
+// the new review. Clean ends the loop; a brake stops it at the gate.
+export function progress(previous: readonly Finding[], now: readonly Finding[], round: number, cap: number): Progress {
+  const sent = previous.filter(isPicked)
+  const left = now.filter(picksByDefault)
+  if (left.length === 0) return { kind: 'clean' }
+  const was = new Set(previous.map(keyOf))
+  const still = new Set(now.map(keyOf))
+  const fixed = sent.filter(f => !still.has(keyOf(f)))
+  const added = left.filter(f => !was.has(keyOf(f)))
+  if (added.length > fixed.length) return { kind: 'rising', added, fixed }
+  const sentKeys = new Set(sent.map(keyOf))
+  if (left.length === sent.length && left.every(f => sentKeys.has(keyOf(f)))) return { kind: 'stuck', reason: 'the same findings came back' }
+  if (left.length >= sent.length) return { kind: 'stuck', reason: `the count didn't drop (${sent.length} sent, ${left.length} back)` }
+
+  return round >= cap ? { kind: 'cap' } : { kind: 'again' }
+}
+
+export function brakeText(p: Progress, round: number, cap: number): string | undefined {
+  const row = (f: Finding) => `- [${f.severity}] ${f.file}:${f.line} ${f.title}`
+  if (p.kind === 'stuck') return `Fix loop stopped after round ${round}: no progress, ${p.reason}.`
+  if (p.kind === 'cap') return `Fix loop stopped: it reached the cap of ${cap} round${cap === 1 ? '' : 's'}.`
+  if (p.kind === 'rising') {
+    return `Fix loop stopped after round ${round}: rising, ${p.added.length} new findings and ${p.fixed.length} fixed.\nNew:\n${p.added.map(row).join('\n') || '- none'}\nFixed:\n${p.fixed.map(row).join('\n') || '- none'}`
+  }
+  return undefined
+}
+
+// What Build reads in a fix round.
+export function fixesText(findings: readonly Finding[], note: string): string {
+  const row = (f: Finding) => `- [${f.severity}] ${f.file}:${f.line} ${f.title}\n  evidence: ${normalize(f.evidence)}${f.proof ? `\n  proof: ${normalize(f.proof)}` : ''}`
+  const picked = findings.filter(isPicked)
+  const owner = note.trim() ? `\n## Owner's note\n\n${note.trim()}\n` : ''
+
+  return `# Fixes\n\nFix only these items. Change nothing else.\n\n${picked.map(row).join('\n') || '- (no findings ticked)'}\n${owner}`
 }

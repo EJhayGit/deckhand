@@ -49,7 +49,7 @@ test('a Normal Fix stops after Plan; Approve sends Tests; each step agent\'s own
   w.outputs['git status --porcelain'] = '?? auth.test.ts\n'
   await agentEnds($, w, clock, 'Added auth.test.ts; it fails.')
   expect(w.spawned).toHaveLength(3)
-  expect(w.spawned[2]!.subagentType).toBe('deckhand:builder')
+  expect(w.spawned[2]!.subagentType).toBe('deckhand:bug-fixer')
   expect(w.spawned[2]!.prompt).toContain('step 3/5: Build')
 
   // The Runs tab shows each step's subagent tagged with its place.
@@ -347,5 +347,30 @@ test('a chat turn that starts no agent blocks the step; Retry sends it again', a
   expect(w.submitted).toHaveLength(2)
   expect(w.spawned[0]!.subagentType).toBe('deckhand:test-writer')
   expect(w.spawned[0]!.prompt).toContain('step 1/4: Tests')
+  await ui.unmount()
+})
+
+test('each step runs on its own agent, not the one in use; a read-only agent put on Build mid-run fails the step and says why', async ($, on) => {
+  const w = world(on, { '.claude/agents/fixer.md': agentFile('fixer', '{ edit: true, run: true, internet: false }') })
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'use-fixer' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  await ui.press({ key: 'swarm-start' })
+  await playChat($, w, clock)
+  expect(w.submitted[0]).toMatch(/^Start the `deckhand:test-writer` agent to run this Deckhand Pipeline step/)
+
+  // Mid-run, the read-only reviewer is put on Build: Start's check is past.
+  await ui.press({ key: 'agent-build' })
+  await ui.press({ key: 'step-agent-reviewer' })
+  w.outputs['git status --porcelain'] = '?? a.test.ts\n'
+  await agentEnds($, w, clock, 'Wrote a.test.ts.')
+
+  expect(w.spawned.map(s => s.subagentType)).toEqual(['deckhand:test-writer'])
+  expect(w.toasts).toContain('Pipeline stopped: Build: reviewer is missing Edit files. Pick an agent that can, then start again.')
+  expect(await ui.find({ type: 'Text', text: 'Pipeline failed: Build: reviewer is missing Edit files. Pick an agent that can, then start again.' })).toBeDefined()
   await ui.unmount()
 })
