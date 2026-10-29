@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { after, fileOf, gatesText, newPipeline, runId, stepPrompt, stepsFor, suggestKind, suggestSize } from '../src/pipeline'
+import { after, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, runId, stepPrompt, stepsFor } from '../src/pipeline'
 import type { PipeRun } from '../types'
 
 test('every size runs the steps in the plan\'s table, for every kind', () => {
@@ -20,21 +20,49 @@ test('each step has its agent: architect plans Big, the owner\'s agent builds an
   expect(newPipeline('x', 't', 'feature', 'tiny', null).steps[0]!.agent).toBeNull()
 })
 
-test('size: short tasks are tiny, long ones grow, security or API words make it at least Normal', () => {
-  expect(suggestSize('Fix the typo in the footer')).toBe('tiny')
-  expect(suggestSize('Rename the button label on the settings page so it reads Save instead of Apply, and update its test in settings.test.ts too')).toBe('small')
-  expect(suggestSize('Fix the login redirect')).toBe('normal')
-  expect(suggestSize('Add a field to the public API')).toBe('normal')
-  expect(suggestSize('Migrate the store')).toBe('normal')
-  expect(suggestSize('word '.repeat(200))).toBe('big')
-  expect(suggestSize('a.ts b.ts c.ts d.ts e.ts f.ts g.ts h.ts i.ts j.ts')).toBe('big')
+test('kind: each rule, in order, with its reason; Feature by default', () => {
+  for (const word of ['fix', 'bug', 'broken', 'error', 'crash']) expect(guessKind(`The ${word} on save`).value).toBe('fix')
+  for (const word of ['add', 'new', 'support']) expect(guessKind(`${word} dark mode`).value).toBe('feature')
+  for (const text of ['Change the header', 'make it blue', 'Use tabs instead']) expect(guessKind(text).value).toBe('change')
+  for (const word of ['clean', 'refactor', 'tidy', 'rename']) expect(guessKind(`${word} the parser`).value).toBe('cleanup')
+  expect(guessKind('The export crashes on empty files')).toEqual({ value: 'fix', reason: 'says "crashes"' })
+  // Fix is checked first, so a bug in a new thing is still a Fix.
+  expect(guessKind('Fix the new button').value).toBe('fix')
+  expect(guessKind('Dark mode for the dashboard')).toEqual({ value: 'feature' })
 })
 
-test('kind: bug words mean Fix, clean-up words Clean up, change words Change, else Feature', () => {
-  expect(suggestKind('The export crashes on empty files')).toBe('fix')
-  expect(suggestKind('Refactor the parser')).toBe('cleanup')
-  expect(suggestKind('Rename the config key')).toBe('change')
-  expect(suggestKind('Add dark mode')).toBe('feature')
+test('size: each rule with its reason; Small by default', () => {
+  expect(guessSize('Fix the typo in the footer of the pricing page on mobile please')).toEqual({ value: 'tiny', reason: 'says "typo"' })
+  for (const word of ['rename', 'copy', 'one line', 'one-line']) expect(guessSize(`${word} the label`).value).toBe('tiny')
+  expect(guessSize('Add dark mode')).toEqual({ value: 'small', reason: 'short task' })
+  expect(guessSize('Add a dark mode toggle to the settings page that remembers the choice across reloads')).toEqual({ value: 'small' })
+  expect(guessSize('')).toEqual({ value: 'small' })
+  for (const word of ['auth', 'login', 'security', 'secrets', 'API', 'migration', 'database', 'payments']) {
+    expect(guessSize(`Touch the ${word} code`)).toEqual({ value: 'normal', reason: `mentions ${word.toLowerCase()}` })
+  }
+  expect(guessSize('Move code from a.ts to b.ts')).toEqual({ value: 'normal', reason: 'names 2 files' })
+  for (const word of ['redesign', 'rewrite', 'new system']) expect(guessSize(`${word} the settings`).value).toBe('big')
+  expect(guessSize('a.ts b.ts c.ts d.ts e.ts f.ts')).toEqual({ value: 'big', reason: 'names 6 files' })
+})
+
+test('security words beat Tiny: a rename in login code is Normal', () => {
+  expect(guessSize('Rename the login token')).toEqual({ value: 'normal', reason: 'mentions login' })
+  expect(guessSize('Fix the typo in a.ts and b.ts').value).toBe('normal')
+})
+
+test('the Auto line covers only the rows on Auto; a picked row overrides it', () => {
+  expect(autoText('Fix the login crash', null, null)).toBe('Auto: Fix · Normal (says "fix", mentions login)')
+  expect(autoText('Fix the login crash', null, 'big')).toBe('Auto: Fix (says "fix")')
+  expect(autoText('Fix the login crash', 'change', null)).toBe('Auto: Normal (mentions login)')
+  expect(autoText('Fix the login crash', 'change', 'big')).toBeUndefined()
+  expect(autoText('Dark mode for the dashboard and every settings screen we ship today', null, null)).toBe('Auto: Feature · Small')
+})
+
+test('after Plan, a Normal plan naming 6+ files is bumped to Big', () => {
+  const plan = 'Edit a.ts, b.ts, c.ts, d.ts, e.ts and f.tsx; check a.ts again.'
+  expect(planBump('normal', plan)).toEqual({ size: 'big', note: 'Size bumped to Big: the plan names 6 files.' })
+  expect(planBump('normal', 'Edit a.ts and b.ts')).toBeUndefined()
+  expect(planBump('big', plan)).toBeUndefined()
 })
 
 test('Fix starts with a failing test; Clean up keeps the tests green', () => {

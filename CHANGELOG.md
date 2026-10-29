@@ -11,6 +11,9 @@
 - **Pipeline** is the Swarm tab's main mode: kind and size chips, ordered
   steps that build on each other, result files in `.deckhand/pipeline/`, and
   stops for your OK after Plan and before Commit. Parallel stays.
+- **Auto Kind and Size:** both start on Auto, guessed from the task's words
+  with the reason shown under the chips. A plan naming 6+ files bumps Normal
+  to Big.
 - **Lead mode and the swarm-lead agent are removed:** Pipeline does the same
   job with your OK at each stop, and swarm-lead needed every limit on.
   `/deck swarm lead` is gone too.

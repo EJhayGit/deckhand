@@ -7,7 +7,7 @@ import type { EngineInterface, TurnUsage } from 'claude-code'
 
 import type { DeckAgent, DeckTab, Finding, PipeKind, PipeRun, PipeSize, Pipeline, Run } from '../types'
 import { applyVerdicts, changedFiles, fixNote, isSerious, mergeFindings, parseFindings, reportText, reviewPrompt, reviewersFor, skepticPrompt } from './findings'
-import { KEEP, STEP_LABEL, after, fileOf, newPipeline, runId, shortText, stepHead, stepPrompt } from './pipeline'
+import { KEEP, STEP_LABEL, after, fileOf, newPipeline, planBump, runId, shortText, stepHead, stepPrompt } from './pipeline'
 import type { PipeEvent } from './pipeline'
 import { addUsage, endRun, newRun } from './runs'
 import { useAgent, useNone } from './session'
@@ -53,7 +53,8 @@ export async function onPipelineTurnEnd($: EngineInterface, prompt: string, reas
   }
   await $.fs.write(fileOf(run, i), answer)
   const steps = run.steps.map((s, j) => (j === i ? { ...s, summary: shortText(answer) } : s))
-  await apply($, { ...run, steps, prompt: null }, { kind: 'done', answer }, true)
+  const bump = run.steps[i]!.id === 'plan' ? planBump(run.size, answer) : undefined
+  await apply($, { ...run, steps, prompt: null, ...(bump ? { size: bump.size, sizeNote: bump.note } : {}) }, { kind: 'done', answer }, true)
 }
 
 // "Fix these first" at the Commit gate: Build again with the confirmed

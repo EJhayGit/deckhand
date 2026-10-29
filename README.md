@@ -70,8 +70,11 @@ the agent in use.
 The **Swarm** tab opens on **Pipeline**: a task runs through steps, each
 building on the last one's result, and it stops for your OK.
 
-1. Type the task. Deckhand suggests a **Kind** (Feature, Fix, Change, Clean
-   up) and a **Size**; click to change them.
+1. Type the task. **Kind** (Feature, Fix, Change, Clean up) and **Size**
+   start on **Auto**: Deckhand guesses them from your words and says why, for
+   example `Auto: Fix · Normal (mentions login)`. Click another chip to pick
+   one yourself, or **Auto** to go back. If the plan names more files than a
+   Normal run should, the first stop says the size was bumped to Big.
 2. Click **Start**.
 
 | Size | Steps | Stops for your OK |

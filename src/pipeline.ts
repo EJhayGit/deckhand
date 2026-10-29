@@ -35,25 +35,71 @@ const STEPS: Record<PipeSize, readonly PipeStepId[]> = {
   big: ['research', 'plan', 'tests', 'build', 'review', 'commit'],
 }
 
-// Security and public-API work is never smaller than Normal.
-const RISKY = /\b(api|auth\w*|login|password|secret|token|permission\w*|migrat\w*|security|crypto|payment\w*|schema|public)\b/i
+// Auto: Kind and Size guessed from the task's words, no model call. Rules are
+// checked in order and the first match wins; each guess says why.
+export type Guess<T> = { value: T; reason?: string }
+
 const FILE = /\b[\w./-]+\.(ts|tsx|js|jsx|py|go|rs|java|rb|cs|css|html|md|json|ya?ml|sql)\b/gi
 
-export function suggestSize(task: string): PipeSize {
-  const files = new Set(task.match(FILE) ?? []).size
-  const words = task.trim().split(/\s+/).filter(Boolean).length
-  let size: PipeSize = words <= 12 && files <= 1 ? 'tiny' : words <= 40 && files <= 3 ? 'small' : words <= 120 && files <= 8 ? 'normal' : 'big'
-  if (RISKY.test(task) && (size === 'tiny' || size === 'small')) size = 'normal'
+const KIND_RULES: readonly [PipeKind, RegExp][] = [
+  ['fix', /\b(fix(?:es|ed|ing)?|bugs?|broken|errors?|crash(?:es|ed|ing)?)\b/i],
+  ['feature', /\b(add(?:s|ed|ing)?|new|supports?)\b/i],
+  ['change', /\b(change[sd]?|make it|instead)\b/i],
+  ['cleanup', /\b(clean(?:s|ed|ing)?|refactor(?:s|ed|ing)?|tidy|rename[sd]?)\b/i],
+]
+// Big beats Normal beats Tiny: security work is never Tiny.
+const BIG = /\b(redesign\w*|rewrite|rewriting|new system)\b/i
+const RISKY = /\b(auth\w*|login|security|secrets?|api|migrat\w*|database|payments?)\b/i
+const TINY = /\b(typo|rename|copy|one[- ]line)\b/i
 
-  return size
+export function filesIn(text: string): number {
+  return new Set((text.match(FILE) ?? []).map(f => f.toLowerCase())).size
 }
 
-export function suggestKind(task: string): PipeKind {
-  if (/\b(fix\w*|bug\w*|broken|crash\w*|error\w*|fail\w*|wrong|regression)\b/i.test(task)) return 'fix'
-  if (/\b(clean\w*|refactor\w*|tidy|dead code|simplif\w*|remove unused)\b/i.test(task)) return 'cleanup'
-  if (/\b(change|rename|replace|update|move|switch|upgrade)\b/i.test(task)) return 'change'
+export function guessKind(task: string): Guess<PipeKind> {
+  for (const [kind, rule] of KIND_RULES) {
+    const hit = task.match(rule)
+    if (hit) return { value: kind, reason: `says "${hit[0].toLowerCase()}"` }
+  }
 
-  return 'feature'
+  return { value: 'feature' }
+}
+
+export function guessSize(task: string): Guess<PipeSize> {
+  const files = filesIn(task)
+  const words = task.trim().split(/\s+/).filter(Boolean).length
+  const big = task.match(BIG)
+  if (big) return { value: 'big', reason: `says "${big[0].toLowerCase()}"` }
+  if (files >= 6) return { value: 'big', reason: `names ${files} files` }
+  const risky = task.match(RISKY)
+  if (risky) return { value: 'normal', reason: `mentions ${risky[0].toLowerCase()}` }
+  if (files >= 2) return { value: 'normal', reason: `names ${files} files` }
+  const tiny = task.match(TINY)
+  if (tiny) return { value: 'tiny', reason: `says "${tiny[0].toLowerCase()}"` }
+  if (words > 0 && words < 12 && files === 0) return { value: 'small', reason: 'short task' }
+
+  return { value: 'small' }
+}
+
+// The line under the chips, for the rows on Auto (null); undefined when none is.
+export function autoText(task: string, kind: PipeKind | null, size: PipeSize | null): string | undefined {
+  const k = guessKind(task)
+  const z = guessSize(task)
+  const guesses = [
+    ...(kind === null ? [{ ...k, label: KINDS.find(x => x.id === k.value)!.label }] : []),
+    ...(size === null ? [{ ...z, label: SIZES.find(x => x.id === z.value)!.label }] : []),
+  ]
+  if (guesses.length === 0) return undefined
+  const reasons = guesses.map(g => g.reason).filter(Boolean)
+
+  return `Auto: ${guesses.map(g => g.label).join(' · ')}${reasons.length ? ` (${reasons.join(', ')})` : ''}`
+}
+
+// After Plan: a Normal plan naming 6+ files is Big work. Only Normal and Big
+// have a Plan step, so Normal -> Big is the only bump.
+export function planBump(size: PipeSize, plan: string): { size: PipeSize; note: string } | undefined {
+  const files = filesIn(plan)
+  return size === 'normal' && files >= 6 ? { size: 'big', note: `Size bumped to Big: the plan names ${files} files.` } : undefined
 }
 
 export function stepsFor(size: PipeSize): readonly PipeStepId[] {

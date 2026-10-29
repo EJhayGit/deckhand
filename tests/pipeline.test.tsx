@@ -106,3 +106,39 @@ test('a step that errors stops the run and shows why', async ($, on) => {
   expect(await ui.find({ key: 'swarm-start' })).toBeDefined()
   await ui.unmount()
 })
+
+test('Kind and Size start on Auto, and the reason line follows the task as it is typed', async ($, on) => {
+  const w = world(on)
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+
+  expect((await ui.find({ key: 'kind-auto' }))?.props.variant).toBe('primary')
+  expect((await ui.find({ key: 'size-auto' }))?.props.variant).toBe('primary')
+
+  await ui.input({ key: 'swarm-task', text: 'Fix the typo' })
+  expect(await ui.find({ type: 'Text', text: 'Auto: Fix · Tiny (says "fix", says "typo")' })).toBeDefined()
+  await ui.input({ key: 'swarm-task', text: 'Fix the login crash' })
+  expect(await ui.find({ type: 'Text', text: 'Auto: Fix · Normal (says "fix", mentions login)' })).toBeDefined()
+
+  // A picked size overrides Auto for that row only; Auto again goes back to guessing.
+  await ui.press({ key: 'size-big' })
+  expect((await ui.find({ key: 'size-auto' }))?.props.variant).toBe('secondary')
+  expect(await ui.find({ type: 'Text', text: 'Auto: Fix (says "fix")' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Normal \(/ })).toBeUndefined()
+  await ui.press({ key: 'size-auto' })
+  expect(await ui.find({ type: 'Text', text: 'Auto: Fix · Normal (says "fix", mentions login)' })).toBeDefined()
+
+  // Start takes the guess: a Normal Fix, so Plan comes first.
+  await ui.press({ key: 'swarm-start' })
+  expect(w.submitted[0]).toContain('step 1/5: Plan')
+
+  // A plan naming 6+ files bumps the size, and the first stop says so.
+  await $.turn.start({ turnId: 't', text: w.submitted[0] } as never)
+  await $.turn.complete(ends('1. a.ts\n2. b.ts\n3. c.ts\n4. d.ts\n5. e.ts\n6. f.ts'))
+  await clock.advance(1)
+  expect(await ui.find({ type: 'Text', text: 'Size bumped to Big: the plan names 6 files.' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Fix · Big · / })).toBeDefined()
+  await ui.unmount()
+})

@@ -22,8 +22,10 @@
   4. **Review + skeptic** (`src/findings.ts`, decision 0009): reviewers fan
      out, findings merge by snippet, the new skeptic agent confirms or
      refutes the serious ones; Fix these first.
+  Then, at the owner's request: **Lead mode and swarm-lead removed**
+  (Parallel stays), and **Auto** chips for Kind and Size (decision 0010).
 - Checks pass: `claude plugin validate .` (the usual no-icon warning), `tsc`
-  with the bundled types, `claude plugin test .` (119 tests).
+  with the bundled types, `claude plugin test .` (122 tests).
 - The test world (`tests/world.ts`) now maps paths correctly inside a git
   worktree (the worktree's own path holds `.claude/`), answers
   `command.list` / `command.run`, and gives per-command `process.run`
@@ -41,7 +43,7 @@ Owner, from the dev-mod copy (marketplace deckhand off):
 2. **Agents:** Use reviewer, then planner, on a small task; check the new
    instructions show (longer checklists, ECC-style plan format).
 3. **Pipeline:** Swarm tab → type a small bug fix → Kind Fix, Size Normal →
-   Start. Approve after Plan; let Tests and Build run; check the Review step
+   Start (or leave both on Auto and check the reason line). Approve after Plan; let Tests and Build run; check the Review step
    starts the reviewers and the skeptic; at the Commit stop, try Fix these
    first or Approve. Plant a real bug to see it survive the skeptic.
 4. Merge the PR when happy.

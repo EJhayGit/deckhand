@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { DeckAgent, PipeRun, PipeStep, Pipeline, SwarmDraft, SwarmMode } from '../../types'
-import { KINDS, SIZES, STEP_LABEL, fileOf, gatesText, suggestKind, suggestSize } from '../pipeline'
+import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize } from '../pipeline'
 import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, startPipeline, stopPipeline } from '../pipelineRun'
 import { PRESETS, startSwarm } from '../swarm'
 
@@ -34,8 +34,8 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
   const hasInput = 'Input' in elements
   // A draft saved while Lead existed opens as Pipeline.
   const mode: SwarmMode = s.mode === 'parallel' ? 'parallel' : 'pipeline'
-  const kind = p.kind ?? suggestKind(s.task)
-  const size = p.size ?? suggestSize(s.task)
+  const size = p.size ?? guessSize(s.task).value
+  const auto = autoText(s.task, p.kind, p.size)
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -56,12 +56,15 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
             <Box flexDirection="column" gap={1}>
               <Box flexDirection="row" gap={1} flexWrap="wrap">
                 <Text dimColor>Kind</Text>
-                {KINDS.map(k => chip(`kind-${k.id}`, k.label, kind === k.id, () => update($, pipeline, now => ({ ...now, kind: k.id }))))}
+                {chip('kind-auto', 'Auto', p.kind === null, () => update($, pipeline, now => ({ ...now, kind: null })))}
+                {KINDS.map(k => chip(`kind-${k.id}`, k.label, p.kind === k.id, () => update($, pipeline, now => ({ ...now, kind: k.id }))))}
               </Box>
               <Box flexDirection="row" gap={1} flexWrap="wrap">
                 <Text dimColor>Size</Text>
-                {SIZES.map(z => chip(`size-${z.id}`, z.label, size === z.id, () => update($, pipeline, now => ({ ...now, size: z.id }))))}
+                {chip('size-auto', 'Auto', p.size === null, () => update($, pipeline, now => ({ ...now, size: null })))}
+                {SIZES.map(z => chip(`size-${z.id}`, z.label, p.size === z.id, () => update($, pipeline, now => ({ ...now, size: z.id }))))}
               </Box>
+              {auto && <Text key="pipeline-auto" color="success">{auto}</Text>}
               <Text dimColor>{gatesText(size)}</Text>
             </Box>
           )}
@@ -111,6 +114,7 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
             <Text color={STATUS_COLOR[step.status]}>{STATUS[step.status]}</Text>
           </Box>
           {(step.status === 'done' || step.status === 'gate') && <Text dimColor>{fileOf(run, i)}</Text>}
+          {step.status === 'gate' && step.id === 'plan' && run.sizeNote && <Text color="warning">{run.sizeNote}</Text>}
           {step.status === 'gate' && step.summary && <Text>{step.summary}</Text>}
           {step.error && <Text color="error">{step.error}</Text>}
         </Box>
@@ -144,7 +148,7 @@ async function start($: EngineInterface) {
   const p = await read($, pipeline)
   const notes = s.mode === 'parallel'
     ? await startSwarm($, s.preset, s.picked, s.task)
-    : await startPipeline($, s.task, p.kind ?? suggestKind(s.task), p.size ?? suggestSize(s.task))
+    : await startPipeline($, s.task, p.kind ?? guessKind(s.task).value, p.size ?? guessSize(s.task).value)
   await update($, swarm, d => ({ ...d, note: notes.length ? notes.join(' ') : null }))
   if (notes.length) $.ui.toast(notes.join(' '))
 }

@@ -75,6 +75,8 @@ export type PipeRun = {
   note?: string
   ended?: 'done' | 'stopped' | 'failed'
   error?: string
+  // Set when the plan turned out bigger than the size picked.
+  sizeNote?: string
   // Review: merged findings, and `skeptic` while the skeptic checks them.
   findings?: Finding[]
   phase?: 'skeptic'
@@ -93,7 +95,7 @@ export type Finding = {
   verdict: 'pending' | 'confirmed' | 'refuted' | 'advice'
   proof?: string
 }
-// The Pipeline's choices (null: take the suggestion), the run, and the last
+// The Pipeline's choices (null: Auto, guessed from the task), the run, and the last
 // run ids (the folders under .deckhand/pipeline/).
 export type Pipeline = { kind: PipeKind | null; size: PipeSize | null; note: string; run: PipeRun | null; history: string[] }
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
