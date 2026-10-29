@@ -53,7 +53,8 @@ export type Run = {
   steps?: { done: number; total: number }
 }
 
-export type DeckTab = 'deck' | 'runs' | 'swarm'
+export type DeckTab = 'deck' | 'runs' | 'swarm' | 'skills'
+export type SkillsView = { query: string; open: string | null; note: string }
 export type SwarmMode = 'parallel' | 'lead'
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 
@@ -85,6 +86,8 @@ declare module 'claude-code' {
       swarmOpen: string | null
       setup: string | null
       enabledPlugins: string[]
+      skillsPinned: string[]
+      skillsView: SkillsView
     }
   }
 }

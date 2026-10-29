@@ -2,7 +2,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderChildren, RenderInput } from 'claude-code'
 
-import type { Chips, Limits, Loop, RepeatMode } from '../../types'
+import type { Agent, Chips, Limits, Loop, RepeatMode } from '../../types'
 import { agentText, refreshDeck, saveToLibrary, writeAgent } from '../agents/library'
 import { CODEX_HINT, LOCAL_HINT } from '../gateway'
 import { LIMIT_LABEL } from '../limits'
@@ -50,7 +50,7 @@ export async function renderChips($: EngineInterface, e: RenderInput) {
       <Box flexDirection="row" columnGap={1}>
         <Text bold>{iconText(agent)} {agent.name}</Text>
         {running && <Button key="stop" label="Stop" onPress={() => void stopLoop($)} />}
-        {isChanged && <Button key="save-chips" label="Save to agent" onPress={() => saveChips($)} />}
+        {isChanged && <Button key="save-chips" label="Save to agent" onPress={() => saveActive($, { model: on.model, effort: on.effort, limits: on.limits })} />}
       </Box>
       {row('Model', MODEL_CHIPS.map(m => chip(`model-${m.id ?? 'default'}`, m.label, on.model === m.id || (m.id === 'local' && on.model?.startsWith('local:') === true), () => setChips($, { model: m.id }))))}
       {row('Effort', EFFORT_CHIPS.map(f => chip(`effort-${f.id}`, f.label, on.effort === f.id, () => setChips($, { effort: on.effort === f.id ? undefined : f.id }))))}
@@ -69,10 +69,11 @@ async function setChips($: EngineInterface, change: Partial<Chips>) {
   await showStatus($)
 }
 
-async function saveChips($: EngineInterface) {
+// Writes a change to the active agent's file: the chips, or a skill added.
+export async function saveActive($: EngineInterface, change: Partial<Agent>) {
   const now = await current($)
   if (!now) return
-  const agent = { ...now.card.agent, model: now.chips.model, effort: now.chips.effort, limits: now.chips.limits }
+  const agent = { ...now.card.agent, ...change }
   if (now.card.source === 'library') {
     await saveToLibrary($, agent.name, agentText(agent, now.card.text))
   } else {

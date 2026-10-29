@@ -12,6 +12,7 @@ import { current, isHiddenAgent, showStatus } from '../src/session'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { DECK, renderDeck } from '../src/ui/deck'
+import { loadPins } from '../src/ui/skills'
 
 const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as string | null)
 
@@ -26,6 +27,7 @@ export const register: Register = (on, options) => {
     await $.tool.register(PROGRESS_TOOL).catch(() => undefined)
     await clearLoop($)
     await refreshDeck($)
+    await loadPins($)
     await showStatus($)
     void $.ui.open(DECK)
 

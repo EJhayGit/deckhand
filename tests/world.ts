@@ -10,6 +10,7 @@ export type World = {
   status: (string | undefined)[]
   agents: { name: string; disallowedTools?: readonly string[]; model?: string }[]
   submitted: string[]
+  ran: string[]
   aborted: string[]
   opened: string[]
   runs: string[][]
@@ -18,6 +19,7 @@ export type World = {
   reply: { ok: boolean; status: number; text: string } | 'refused'
   enabledPlugins: Record<string, boolean>
   spawned: { subagentType: string; description: string; prompt: string }[]
+  commands: { name: string; description: string; source: 'builtin' | 'plugin' | 'user' | 'mcp'; plugin?: string }[]
 }
 
 export function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}): World {
@@ -28,6 +30,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     status: [],
     agents: [],
     submitted: [],
+    ran: [],
     aborted: [],
     opened: [],
     runs: [],
@@ -36,6 +39,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     reply: { ok: true, status: 200, text: '{}' },
     enabledPlugins: {},
     spawned: [],
+    commands: [],
   }
   mock.store(on, store)
   known = Object.keys(files)
@@ -89,6 +93,11 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     w.spawned.push({ subagentType: e.subagentType, description: e.description, prompt: e.prompt })
     return { model: 'claude-sonnet-5-5', agentId: `a${w.spawned.length}` }
   })
+  on('command.list', () => ({ value: w.commands }))
+  on('command.run', (_, e) => {
+    w.ran.push(`/${e.command}${e.args ? ` ${e.args}` : ''}`)
+    return { text: '' }
+  })
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('agent.register', (_, e) => {
     w.agents.push({ name: e.name, disallowedTools: e.disallowedTools, model: e.model })
@@ -114,9 +123,11 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
 // and other paths by their end (AGENTS.md under the project root).
 function rel(path: string): string {
   const p = path.replaceAll('\\', '/')
-  const at = p.indexOf('.claude/')
-  if (at >= 0) return p.slice(at)
-  return known.find(k => p === k || p.endsWith(`/${k}`)) ?? p
+  const file = known.find(k => p === k || p.endsWith(`/${k}`))
+  if (file) return file
+  // Last match: a worktree's own path holds .claude/ too.
+  const at = p.lastIndexOf('.claude/')
+  return at >= 0 ? p.slice(at) : p
 }
 let known: string[] = []
 

@@ -322,3 +322,189 @@ Built on branch `build-v2` after 0.1.0 and merged as PR #6. Details and reasons 
   `docs/decisions/`.
 - When the API can't do something this plan assumes, build the closest option
   and say so in plain words in the PR. Don't change a feature silently.
+
+## 14. Skills, ECC agents and Pipeline (master plan, 2026-10-29)
+
+Copied from the owner's master plan. Build notes and API gaps are in
+`docs/decisions/0006`-`0009` and the PR.
+
+### Goal
+
+Deckhand becomes one menu for agents, skills and multi-agent work. This plan adds a Skills tab, a credited pack of agents adapted from ECC (Everything Claude Code, MIT), and reworks the Swarm tab into a Pipeline modeled on ECC's `orch-*` engine and its review workflow. Nothing here depends on ECC being installed. We borrow ideas and a few adapted files.
+
+**For the build agent:** read `CLAUDE.md`, `PLAN.md` and `docs/handoff.md` first, as always. One prompt is enough: build all four milestones in order, on one branch with one PR, committing after each one, without stopping to ask in between. Work inline with no subagents. Copy this plan into `PLAN.md` as section 14 before starting.
+
+**Model:** run it on Opus. To save tokens, Milestone 2 alone can run on Sonnet as a separate prompt.
+
+Rules from `CLAUDE.md` that matter most here:
+
+- Load the `plugin-authoring` skill before touching mod code.
+- Work inline. Don't spawn subagents to build this. The Pipeline *feature* starts agents for the user, which is fine.
+- Keep pure logic (pipeline sizing, step planning, finding merge) free of `$`, so it tests without the engine.
+- Limits stay in the `tool.call` guard and fail closed. Never weaken a limit test.
+- Automated tests make no paid model calls. Use the mocked clock.
+- Never write `~/.claude/...` without a confirm button the owner presses.
+- Each design choice gets a short note in `docs/decisions/`.
+- Run `claude plugin validate .`, `tsc -p .` and `claude plugin test .` before each commit.
+
+### Where Deckhand is today
+
+As of 0.2.1 plus the unmerged `band-layout` branch, the deck panel has three tabs (`DeckTab = 'deck' | 'runs' | 'swarm'` in `types/index.d.ts`).
+
+| Part | What it does now | Main files |
+| --- | --- | --- |
+| Deck | 16 built-in agents in five groups, plus project and library agents from `.claude/agents/`. Chips for model, effort, limits, repeat. | `src/agents/starters.ts`, `src/agents/library.ts`, `src/agents/format.ts`, `src/ui/deck.tsx`, `src/ui/chips.tsx` |
+| Runs | One row per started agent with steps, context, tokens, estimated cost and time. | `src/runs.ts`, `src/tracker.ts`, `src/ui/runs.tsx` |
+| Swarm | Parallel (preset or custom agents, each gets the same task) or Lead (swarm-lead splits the task). Both start by submitting a prompt with `$.prompt.submit({ text, asUser: true })`. | `src/swarm.ts`, `src/ui/swarm.tsx` |
+| Skills | Only as a `skills` list inside an agent file, added to that agent's instructions. No menu. | `hooks/register.tsx` |
+
+The Swarm tab's weak spot is that Parallel agents never see each other's work, and Lead's choices are hidden. There is no plan, no hand-off and no point where the owner approves.
+
+### Milestone 1: Skills tab
+
+A fourth tab, Skills, lists every installed skill. One click runs it, so nobody has to remember or type `/skill-name`.
+
+**What the owner sees**
+
+- A Pinned row at the top, then one group per source: Project, Personal, and one per plugin (for example `document-skills`).
+- Each skill shows its name and the first line of its description. A search box filters by name or description.
+- Pressing a skill opens a small form with an optional note and a Run button. Run submits `/<skill> <note>` as the owner's own prompt, the same way swarms start.
+- A pin button on each skill. Pins persist per project.
+- Below the list: "Add to agent", which appends the skill to the active agent's `skills` list using the existing Save to agent path.
+
+**How to build it**
+
+1. Add `'skills'` to `DeckTab` in `types/index.d.ts`, and a `skillsPinned: string[]` key to the state contract.
+2. First grep `.claude-plugin/types/claude-code/index.d.ts` for a call that lists skills or commands. If one exists, use it.
+3. If not, read skill folders directly with `$.fs`: project `.claude/skills/*/SKILL.md`, personal `~/.claude/skills/*/SKILL.md` (read only), and each enabled plugin's `skills/*/SKILL.md` under the plugin install folder. Find the plugin folder the same way `src/plugins.ts` resolves plugins today. Write a decision note on which road you took.
+4. Put the parsing in a pure module, `src/skills.ts`: frontmatter to `{ id, name, description, source }`, grouping, search, and the `/plugin:skill` name form.
+5. Draw it in `src/ui/skills.tsx`. Wire the tab in `hooks/register.tsx` only.
+
+**Tests**
+
+- `tests/skills.test.ts`: frontmatter parsing (missing or long description, odd quoting), grouping, search and the name form.
+- `tests/skills.test.tsx`: the tab lists skills from the memory world, Run submits the right prompt, pins survive a reload.
+
+**Done when** the tab lists real skills in a live session, Run starts one, and the checks pass.
+
+### Milestone 2: ECC agents become the defaults
+
+Where ECC has a stronger version of a Deckhand built-in, its version replaces ours. Ours run about 30 lines each. ECC's carry real checklists and examples (its code-reviewer is 323 lines, its planner 221). Two ECC agents with no match are added because the Pipeline uses them. Source: [affaan-m/ECC](https://github.com/affaan-m/ECC) `agents/` at commit `25278e7`, MIT, copyright 2026 Affaan Mustafa.
+
+| Deckhand built-in | Becomes (ECC agent) | Notes |
+| --- | --- | --- |
+| reviewer | `code-reviewer` | Keep the id `reviewer` so saved swarms and project overrides still match. |
+| planner | `planner` | Pipeline's Plan step. |
+| test-writer | `tdd-guide` | Pipeline's Tests step. Keep the id `test-writer`. |
+| security-auditor | `security-reviewer` | Pipeline's Review step uses it on security triggers. |
+| refactorer | `refactor-cleaner` |  |
+| docs-writer | `doc-updater` |  |
+| bug-fixer | `build-error-resolver` | Merge in our "reproduce first" steps, which ECC's lacks. |
+| (new) architect | `architect` | Plan step for Big tasks. Read only. |
+| (new) typescript-reviewer | `typescript-reviewer` | Review step when the diff has TypeScript. |
+
+Keep ours as they are where ECC has no match: test-runner, researcher, frontend-designer, ui-critic, graphics-designer, website-reviewer, dependency-auditor, change-security-review, swarm-lead.
+
+**How to adapt each one**
+
+1. Replace the body in `src/agents/starters.ts`. Keep each existing id, group and icon so nothing that refers to it breaks.
+2. Keep ECC's content: its steps, checklists and examples. Cut anything that points at ECC-only commands, skills or rules, and anything for languages Deckhand users won't need in a general agent.
+3. Trim to about 150 lines at most. Every line costs tokens each time the agent runs.
+4. Set Deckhand limits, since the guard enforces those rather than a `tools` list. Reviewers, planner and architect: edit off, run off or read-only. Fixers and test writers: edit on, run on. Internet off for all of them.
+5. Add an `origin: ECC <agent> @ 25278e7` comment above each one.
+
+**Credit:** add `THIRD_PARTY_NOTICES.md` with ECC's full MIT license text and copyright line, and a "Built-in agents adapted from ECC by Affaan Mustafa" line in the README. Write `docs/decisions/0006-ecc-default-agents.md` listing what was taken and why.
+
+**Tests:** update `tests/catalog.test.ts` so every built-in still loads and parses, ids are unchanged, the two new ones appear, each limit matches the rules above, and a project agent with the same name still wins.
+
+**Done when** the deck shows the new defaults with their old names, and a live run of reviewer and planner uses the new instructions.
+
+### Milestone 3: Pipeline (rework the Swarm tab)
+
+Pipeline becomes the Swarm tab's main mode. It runs a task through ordered steps, and each step builds on the last one's result. The owner approves twice: after the plan and before the commit. This is ECC's `orch-pipeline` recipe, rebuilt in Deckhand's own UI.
+
+*(Diagram in the original: Normal pipeline · 5 steps, 2 stops for your OK.)*
+
+Change sends the plan back with your note. Fix these first sends confirmed review findings back to Build before you commit.
+
+**Kind and size.** The owner types the task, then picks a kind and a size. Deckhand suggests both and the owner can change them.
+
+- Kinds (from ECC's `orch-*` family): Feature, Fix, Change, Clean up. The kind sets the first move. Fix starts with a failing test. Clean up must keep the tests green.
+- Sizes set which steps run. The suggestion comes from a pure heuristic in `src/pipeline.ts` (task length, number of files named, words like "API", "auth" or "migrate"). Anything touching security or a public API is at least Normal.
+
+| Size | Steps that run | Stops for OK |
+| --- | --- | --- |
+| Tiny | Build → Review → Commit | before Commit |
+| Small | Tests → Build → Review → Commit | before Commit |
+| Normal | Plan → Tests → Build → Review → Commit | after Plan, before Commit |
+| Big | Research → Plan → Tests → Build → Review → Commit | after Plan, before Commit |
+
+**Who does each step**
+
+- Research: `researcher` (read only, internet on).
+- Plan: `planner`, or `architect` for Big. Output is a numbered task list of thin slices.
+- Tests: `test-writer` (now ECC's tdd-guide).
+- Build: the main chat with the active agent, so the owner watches the code change.
+- Review: Milestone 4.
+- Commit: the main chat, one commit per logical chunk.
+
+**Hand-offs.** Each step writes its result to `.deckhand/pipeline/<run-id>/<nn>-<step>.md`, and the next step's prompt names that file. Files are the hand-off because the mod can't read a subagent's final answer directly. They also leave a record the owner can open.
+
+**Running a step.** Deckhand submits each step as the owner's own prompt with `$.prompt.submit`, like swarms do now. When that turn ends (the hook `closeSwarm` already uses), it marks the step done and either submits the next one or stops at a gate. One step per turn, so a gate can never fall in the middle of a step.
+
+**Gates.** At a gate the Swarm tab shows the step's result file in short form and three buttons: Approve (go on), Change (type a note, then the step runs again with it) and Stop.
+
+**The tab**
+
+- Top: task box, kind chips, size chips, Start.
+- Middle: one card per step showing icon, agent, status (waiting, running, done, needs OK, failed) and a link to its result file.
+- Mode chips: Pipeline (default), Parallel (kept for quick fan-out) and Lead under "More".
+- Runs: every step's agent shows as a row tagged with the step, for example `Pipeline 3/5 · Tests`.
+
+**Code**
+
+- `src/pipeline.ts` (pure): size heuristic, steps for a kind and size, next step after an event, prompt text per step.
+- `src/pipelineRun.ts`: the `$` side (submit, turn-end, result files). Wire it in `hooks/register.tsx`.
+- `src/ui/swarm.tsx`: the new layout. Add a `pipeline` key to `types/index.d.ts`.
+- `docs/decisions/0007-pipeline.md`.
+
+**Tests**
+
+- Pure: every kind and size gives the table's steps, security words bump the size, Fix starts with a failing test, and Change re-runs the same step with the note.
+- Engine: a Normal run stops after Plan, Approve submits Tests, Stop ends it, and a failed step stops the run and shows the error. Use the mocked clock and fake turn ends, with no model calls.
+- Limits: each step's agent keeps its own limits in `tool.call`. A read-only Plan agent can't edit.
+
+**Done when** a Normal Fix runs end to end in a live session with both stops, and the checks pass.
+
+### Milestone 4: Review step with a skeptic check
+
+The Review step runs several reviewers side by side, merges their duplicate findings, then has a skeptic agent re-check every serious one. This copies ECC's `orch-review` workflow, where 11 raw findings shrank to 4 real ones and the checking cost roughly halved.
+
+1. **Fan out.** One turn asks the main chat to start these deck agents at once, the way Parallel does today: `reviewer` always, `typescript-reviewer` when the diff has `.ts` or `.tsx` files, and `security-auditor` (now ECC's security-reviewer) when the diff touches a security trigger (auth, secrets, shell commands, network, file paths, permissions).
+2. **Same format.** Each reviewer appends findings to the step's result file as one JSON line each: `severity` (critical, high, medium, low), `file`, `line`, `title`, `evidence` (the exact code snippet) and `reviewer`.
+3. **Merge (pure, `src/findings.ts`).** Group findings by their whitespace-normalized `evidence` snippet, because line numbers and titles drift between reviewers but the code doesn't. Keep the strictest severity and list every reviewer that found it.
+4. **Skeptic.** A new read-only built-in agent, `skeptic`, checks each unique critical or high finding. It must quote the code that proves the bug, or mark the finding refuted. When unsure, it refutes. Medium and low findings pass through as advice.
+5. **Show.** The step card lists confirmed findings first, then advice, with who found each one. If anything is confirmed, the Commit gate offers "Fix these first", which runs Build again with the findings, then Review again.
+
+**Fail closed.** If the diff is empty, a result file is missing or a line won't parse, the step fails and shows why. It never passes a review that didn't happen.
+
+**Tests:** merge cases (same snippet with a different line or title, different severities), the security trigger, the skeptic refuting by default, and malformed lines failing the step.
+
+**Done when** a live Review on a real diff shows merged findings with reviewer names, and a planted bug survives the skeptic.
+
+### Out of scope, risks and open questions
+
+**Not in this plan:** installing ECC itself, ECC's hooks, rules or memory and learning system, its MVP-from-spec mode, its agents beyond the nine in Milestone 2, and running steps in the background without the owner.
+
+**Risks**
+
+- No mod call may list skills. The fallback is reading skill folders, and plugin install paths could change between Claude Code versions.
+- Auto mode can refuse agent starts that nobody asked for. Every step must go out as the owner's own prompt, like swarms do now.
+- More steps means more tokens. The size check keeps small tasks short, and Runs already shows the cost.
+- `.deckhand/pipeline/` files pile up. Add it to `.gitignore` and keep only the last 20 runs.
+
+**Open questions for the owner**
+
+- [ ] Keep Lead under "More", or remove it?
+- [ ] Should Pipeline's Build step use the active agent or always a fixed one?
+- [ ] Any agent to add to or drop from the swap list in Milestone 2?
