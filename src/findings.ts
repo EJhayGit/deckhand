@@ -133,6 +133,29 @@ anything, answer exactly: ${NONE}
 `
 }
 
+// One reviewer's own prompt, when Deckhand spawns the reviewers itself.
+export function reviewerPrompt(head: string, diffFile: string, untracked: readonly string[], name: string): string {
+  const extra = untracked.length ? `\nNew files not in the diff (read them too): ${untracked.join(', ')}` : ''
+
+  return `${head}
+
+Review the change in ${diffFile}.${extra}
+
+Read the diff file and the code around it, change nothing, and report every
+finding as one JSON line exactly like:
+${FINDING_FORMAT}
+severity is critical, high, medium or low; evidence is the exact code snippet;
+reviewer is "${name}". Your whole final answer is only your finding lines, one
+per line, with nothing else. If you found nothing, answer exactly: ${NONE}
+`
+}
+
+// The reviewers' answers as one review: lines from each, none if all found nothing.
+export function joinReviews(answers: readonly string[]): string {
+  const found = answers.filter(a => a.trim().toUpperCase() !== NONE)
+  return found.length ? found.join('\n') : NONE
+}
+
 export function skepticPrompt(head: string, diffFile: string, serious: readonly Finding[]): string {
   const list = serious.map(f => `${f.id}. [${f.severity}] ${f.file}:${f.line} ${f.title}\n   evidence: ${normalize(f.evidence)}`).join('\n')
 

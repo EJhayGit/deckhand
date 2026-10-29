@@ -5,11 +5,11 @@ import { refreshDeck } from '../src/agents/library'
 import { gatewayOptions } from '../src/gateway'
 import { codexAnswer, localAnswer } from '../src/gatewayTurn'
 import { COMMAND, runDeck } from '../src/commands'
-import { blockedNote, blockingLimit } from '../src/limits'
+import { blockedNote, blockingLimit, limitsFor } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
-import { current, isHiddenAgent, showStatus } from '../src/session'
-import { onPipelineBlocked, onPipelineTurnEnd } from '../src/pipelineRun'
+import { current, isHiddenAgent, loopAgent, showStatus } from '../src/session'
+import { onPipelineAgentEnd, onPipelineBlocked, onPipelineTurnEnd } from '../src/pipelineRun'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { DECK, renderDeck } from '../src/ui/deck'
@@ -78,6 +78,7 @@ export const register: Register = (on, options) => {
       await onPipelineTurnEnd($, prompt, e.reason, e.answer, e.usage)
     } else {
       await onAgentEnd($, e.agentId, e.reason)
+      await onPipelineAgentEnd($, e.agentId, e.reason, e.answer)
     }
 
     return done
@@ -116,15 +117,18 @@ export const register: Register = (on, options) => {
     return yield* next({ ...e, model, ...(effort === undefined ? {} : { effort }) })
   })
 
-  // Limits hold on every tool call, subagents included. Fails closed.
+  // Limits hold on every tool call, subagents included: a deck subagent or a
+  // Pipeline step keeps its own, any other loop the agent in use's. Fails closed.
   on('tool.call', async ($, e, next) => {
+    const own = e.agentId === undefined ? undefined : await loopAgent($, e.agentId)
     const now = await current($)
-    const limit = now ? blockingLimit(now.chips.limits, e.tool) : undefined
-    if (!now || !limit) return next(e)
-    const note = blockedNote(now.card.agent.name, e.tool, e as unknown as Record<string, unknown>, limit)
+    const who = limitsFor(own, now && { name: now.card.agent.name, limits: now.chips.limits })
+    const limit = who ? blockingLimit(who.limits, e.tool) : undefined
+    if (!who || !limit) return next(e)
+    const note = blockedNote(who.name, e.tool, e as unknown as Record<string, unknown>, limit)
     $.ui.toast(note)
     $.ui.log(note)
-    if (e.agentId === undefined) await onPipelineBlocked($, note, limit)
+    await onPipelineBlocked($, note, limit, e.agentId)
 
     return { deny: note }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'Deckhand blocked this call because its limit check failed.' }))

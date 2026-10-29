@@ -144,10 +144,13 @@ export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null,
   return installed[want] ? { agent: want } : { agent: null, note: `No ${want} agent installed: plain Claude Code runs this step.` }
 }
 
-// Steps whose agent lacks a permission the step needs.
-export function preflight(steps: readonly PipeStep[], installed: Installed): PipeShortfall[] {
+// Steps whose agent lacks a permission the step needs, or can't run as a
+// subagent (`local`: agents on Local or Codex models, which answer only the
+// main chat).
+export function preflight(steps: readonly PipeStep[], installed: Installed, local: readonly string[] = []): PipeShortfall[] {
   return steps.flatMap(s => {
     if (s.agent === null) return []
+    if (local.includes(s.agent)) return [{ step: s.id, agent: s.agent, missing: [], reason: 'runs on a Local or Codex model and can\'t run as a subagent.' }]
     const limits = installed[s.agent]
     const missing = NEEDS[s.id].filter(l => limits?.[l] !== true)
     return missing.length ? [{ step: s.id, agent: s.agent, missing }] : []
@@ -155,6 +158,7 @@ export function preflight(steps: readonly PipeStep[], installed: Installed): Pip
 }
 
 export function shortfallText(s: PipeShortfall): string {
+  if (s.reason) return `${STEP_LABEL[s.step]}: ${s.agent} ${s.reason}`
   return `${STEP_LABEL[s.step]}: ${s.agent} is missing ${s.missing.map(l => LIMIT_LABEL[l]).join(', ')}.`
 }
 
@@ -163,9 +167,21 @@ export function withAgent(run: PipeRun, step: PipeStepId, agent: string | null):
   return { ...run, steps: run.steps.map(s => (s.id === step && s.status !== 'done' ? { ...s, agent, note: undefined } : s)) }
 }
 
-// The agent to put back when the run ends or stops.
-export function agentAfter(run: Pick<PipeRun, 'owner'>, installed: Installed): string | null {
-  return run.owner !== null && installed[run.owner] ? run.owner : null
+// The subagent type a step spawns: its deck card's, plain Claude Code as
+// general-purpose.
+export function typeOf(agent: string | null, cards: readonly { name: string; agentType?: string }[]): string {
+  if (agent === null) return 'general-purpose'
+  return cards.find(c => c.name === agent)?.agentType ?? `deckhand:${agent}`
+}
+
+// Send through chat: asks the main chat to start the step's subagent, for
+// when Claude Code refused Deckhand's own start.
+export function chatPrompt(type: string, body: string): string {
+  return `Start the \`${type}\` agent now with one Agent call (subagent_type \`${type}\`), giving it
+the instructions below exactly. Do none of the work yourself. When it
+finishes, your whole final answer is its final answer, unchanged.
+
+${body}`
 }
 
 // Steps that must change files: Tests (except a clean-up's) and Build.

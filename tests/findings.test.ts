@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { NONE, applyVerdicts, changedFiles, mergeFindings, parseFindings, reportText, reviewersFor, securityTrigger } from '../src/findings'
+import { NONE, applyVerdicts, changedFiles, joinReviews, mergeFindings, parseFindings, reportText, reviewerPrompt, reviewersFor, securityTrigger } from '../src/findings'
 
 const line = (o: Record<string, unknown>) => JSON.stringify({ severity: 'high', file: 'src/a.ts', line: 3, title: 'Bug', evidence: 'x = y', reviewer: 'reviewer', ...o })
 
@@ -71,4 +71,15 @@ test('security triggers add the security reviewer; TypeScript files add the Type
 
 test('changed files from git status, renames by their new name', () => {
   expect(changedFiles(' M src/a.ts\n?? new.md\nR  old.ts -> src/b.ts\n')).toEqual(['src/a.ts', 'new.md', 'src/b.ts'])
+})
+
+test('each spawned reviewer gets its own prompt; their answers join into one review', () => {
+  const prompt = reviewerPrompt('Step 4/5: Review.', 'r/04-review.diff', ['new.ts'], 'security-auditor')
+  expect(prompt).toContain('Review the change in r/04-review.diff.')
+  expect(prompt).toContain('read them too): new.ts')
+  expect(prompt).toContain('reviewer is "security-auditor"')
+  expect(prompt).toContain(`answer exactly: ${NONE}`)
+  expect(joinReviews([NONE, line({}), ' no findings '])).toBe(line({}))
+  expect(joinReviews([NONE, NONE])).toBe(NONE)
+  expect(parseFindings(joinReviews([line({}), line({ evidence: 'z' })]))).toHaveLength(2)
 })

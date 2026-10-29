@@ -1,5 +1,9 @@
 # Pipeline step agents, preflight and blocked steps
 
+The step-to-agent table, preflight and blocked steps still hold. How each
+step runs (switching the agent in use) is replaced by
+`0012-pipeline-subagents.md`.
+
 Date: 2026-10-29. Replaces 0007's rule "Build and Commit use the agent that
 was in use when the run started".
 

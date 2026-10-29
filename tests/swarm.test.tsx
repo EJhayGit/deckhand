@@ -77,8 +77,8 @@ test('a draft saved while Lead existed opens and starts as a Pipeline', async ($
   await ui.press({ key: 'tab-swarm' })
   expect(await ui.find({ key: 'mode-lead' })).toBeUndefined()
   await ui.press({ key: 'swarm-start' })
-  expect(w.submitted[0]).toContain('Deckhand pipeline')
+  expect(w.spawned[0]?.prompt).toContain('Deckhand pipeline')
   // The task came from the seeded draft, so the old Lead draft was read.
-  expect(w.submitted[0]).toContain('Add dark mode')
+  expect(w.spawned[0]?.prompt).toContain('Add dark mode')
   await ui.unmount()
 })

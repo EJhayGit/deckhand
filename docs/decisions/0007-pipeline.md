@@ -14,7 +14,9 @@ OK after Plan and before Commit (`PLAN.md` 14, Milestone 3).
   Big. Both are suggested from the task text (`src/pipeline.ts`) and the
   owner can change them. Security or public-API words make it at least
   Normal. The size picks the steps from the plan's table.
-- **Every step runs in the main chat, with that step's agent in use.** The
+- **Every step runs in the main chat, with that step's agent in use.**
+  (Replaced by `0012-pipeline-subagents.md`: each step is now a subagent
+  Deckhand spawns.) The
   plan expected step agents to write their own result files because the mod
   can't read a subagent's answer. But the mod does see the main chat's answer
   (`turn.complete`'s `answer`). So Deckhand makes the step's agent active,
