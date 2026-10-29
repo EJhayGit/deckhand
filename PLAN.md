@@ -309,6 +309,10 @@ Built on branch `build-v2` after 0.1.0 and merged as PR #6. Details and reasons 
   asked for) and Lead (swarm-lead, which allows everything so its workers
   keep their own limits).
 
+v0.3 (section 14) adds the Skills tab, ECC-adapted built-ins (plus architect,
+typescript-reviewer and skeptic), and the Pipeline as the Swarm tab's main
+mode; Parallel stays and Lead moves under More.
+
 ## 13. Working rules for the building agent
 
 - Read `CLAUDE.md`, this plan and `docs/handoff.md` at the start of every
