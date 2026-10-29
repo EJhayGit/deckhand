@@ -2,7 +2,7 @@
 
 ## State
 
-- **0.6.0 is on branch `claude/pipeline-review-fix-loop-faacd7`, not pushed**
+- **0.6.0 is released** (PR #18 merged, tag `v0.6.0`)
   (`docs/decisions/0015-review-fix-loop.md`, PLAN §16). The Review fix loop:
   - The Review gate lists findings with ☑/☐ (medium and up ticked). Fix
     these / Approve / Stop; Change at Review means Fix these.
@@ -68,8 +68,10 @@ Owner, from the dev-mod copy, with the marketplace deckhand turned off (it's
 
 Run a Tiny Pipeline in the sandbox repo that leaves a medium finding, then
 at the Review stop tick/untick findings, press **Fix these**, and watch the
-round go Build → Review with `Round 1/3 · …` rows in Runs. Then push the
-branch, open the 0.6.0 PR, and tag `v0.5.0` on main if it isn't yet.
+round go Build → Review with `Round 1/3 · …` rows in Runs. Run only one
+Deckhand copy: on 2026-10-29 the marketplace copy and a dev-mod copy ran
+together and a command was blocked as docs-writer with the Deck showing None.
+If that happens with one copy, run `/deck limits` right then.
 
 Left-over low review items on PR #17 (not fixed, by the owner's choice):
 Put on step after an ended run isn't visible until Clear; dead skill cards
