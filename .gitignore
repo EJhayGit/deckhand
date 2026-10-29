@@ -25,3 +25,6 @@ Thumbs.db
 
 # Types Claude Code lays for the mod on load
 .claude-plugin/types/
+
+# Pipeline result files (Deckhand writes these in the project)
+.deckhand/

@@ -119,7 +119,7 @@ export async function closeSwarm($: EngineInterface, prompt: string): Promise<vo
 
 // `later`: a slash command can't submit while it holds the turn, so the
 // prompt goes once the command has returned.
-async function send($: EngineInterface, text: string, later: boolean) {
+export async function send($: EngineInterface, text: string, later: boolean) {
   if (later) {
     $.clock.after(0, () => void $.prompt.submit({ text, asUser: true }))
   } else {

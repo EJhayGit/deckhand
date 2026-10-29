@@ -22,6 +22,7 @@ test('Parallel sends one visible prompt asking Claude to start each pick, and of
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
   await ui.press({ key: 'tab-swarm' })
+  await ui.press({ key: 'mode-parallel' })
   await ui.press({ key: 'swarm-start' })
   expect(await ui.find({ type: 'Text', text: 'Type the task first.' })).toBeDefined()
   expect(w.submitted).toEqual([])
@@ -52,6 +53,7 @@ test('Custom picks ask only for the picked agents, a project one by its file nam
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 
   await ui.press({ key: 'tab-swarm' })
+  await ui.press({ key: 'mode-parallel' })
   for (const name of ['researcher', 'frontend-designer', 'graphics-designer', 'reviewer']) await ui.press({ key: `pick-${name}` })
   await ui.press({ key: 'pick-fixer' })
   await ui.input({ key: 'swarm-task', text: 'Fix the login bug' })

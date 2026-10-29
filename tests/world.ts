@@ -126,7 +126,7 @@ function rel(path: string): string {
   const file = known.find(k => p === k || p.endsWith(`/${k}`))
   if (file) return file
   // Last match: a worktree's own path holds .claude/ too.
-  const at = p.lastIndexOf('.claude/')
+  const at = Math.max(p.lastIndexOf('.claude/'), p.lastIndexOf('.deckhand/'))
   return at >= 0 ? p.slice(at) : p
 }
 let known: string[] = []
