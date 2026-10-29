@@ -56,6 +56,28 @@ test('a pins file already in the project shows as Pinned', async ($, on) => {
   await ui.unmount()
 })
 
+test('pinned skills show as small cards on the Deck tab, and a card opens its skill', async ($, on) => {
+  const w = world(on, { [PINS_PATH]: '["release-notes"]' })
+  w.commands = SKILLS
+  mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  expect(await ui.find({ key: 'deck-skill-release-notes' })).toBeDefined()
+  await ui.press({ key: 'deck-skill-release-notes' })
+  expect(await ui.find({ key: 'run-release-notes' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the Deck tab says how to pin when no skill is pinned', async ($, on) => {
+  world(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Text', text: 'Pin skills in the Skills tab to see them here.' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('Add to agent appends the skill to the active agent\'s file', async ($, on) => {
   const w = world(on, { '.claude/agents/fixer.md': agentFile('fixer') })
   w.commands = SKILLS

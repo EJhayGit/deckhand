@@ -7,6 +7,7 @@ import type { DeckAgent, PipeRun, PipeStep, PipeStepId, Pipeline, SwarmDraft, Sw
 import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, shortfallText } from '../pipeline'
 import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline } from '../pipelineRun'
 import { PRESETS, startSwarm } from '../swarm'
+import { renderMiniCard } from './miniCard'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
 const swarm = atom({ plugin: 'deckhand', key: 'swarm' } as const, { preset: 'launch-kit', picked: Object.keys(PRESETS[0]!.parts), mode: 'pipeline', task: '', note: null } as SwarmDraft)
@@ -20,6 +21,8 @@ const MODES: readonly { id: SwarmMode; label: string; hint: string }[] = [
 
 const STATUS: Record<PipeStep['status'], string> = { waiting: 'waiting', running: 'running', done: 'done', gate: 'needs OK', failed: 'failed', blocked: 'blocked' }
 const STATUS_COLOR: Partial<Record<PipeStep['status'], string>> = { running: 'warning', done: 'success', gate: 'warning', failed: 'error', blocked: 'error' }
+// Glyph plus word, one Text; a gate step's work is done, its OK is the second.
+const STATUS_TEXT: Record<PipeStep['status'], string> = { waiting: '○ waiting', running: '▶ running', done: '✓ done', gate: '✓ done', failed: '✗ failed', blocked: '■ blocked' }
 const STEP_ICON: Record<PipeStep['id'], string> = { research: '🔭', plan: '🗺️', tests: '✅', build: '🛠️', review: '🔍', commit: '📦' }
 
 export async function renderSwarm($: EngineInterface, e: RenderInput) {
@@ -69,13 +72,9 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
               </Box>
               {auto && <Text key="pipeline-auto" color="success">{auto}</Text>}
               <Text dimColor>{gatesText(size)}</Text>
-              {preview.steps.map(step => (
-                <Box key={`plan-step-${step.id}`} flexDirection="column">
-                  {stepAgentRow($, e, step)}
-                  {step.note && <Text dimColor>{step.note}</Text>}
-                  {p.picking === step.id && renderPicker($, e, step.id, cards)}
-                </Box>
-              ))}
+              {renderTrack($, e, preview.steps, undefined, true)}
+              {preview.steps.filter(step => step.note).map(step => <Text key={`plan-note-${step.id}`} dimColor>{step.note}</Text>)}
+              {p.picking && renderPicker($, e, p.picking, cards)}
               {(p.preflight ?? []).map(short => (
                 <Box key={`preflight-${short.step}`} flexDirection="row" gap={1} flexWrap="wrap">
                   <Text color="error">{shortfallText(short)}</Text>
@@ -111,14 +110,25 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
   )
 }
 
-// A step's agent, with the small chip that opens its picker.
-function stepAgentRow($: EngineInterface, e: RenderInput, step: PipeStep) {
+// Steps as a wrapping row of small cards; the current one has a bold border.
+function renderTrack($: EngineInterface, e: RenderInput, steps: PipeStep[], run: PipeRun | undefined, canPick: boolean) {
   const { Box, Text, Button } = $.ui.resolve(e)
+
   return (
-    <Box flexDirection="row" gap={1}>
-      <Text>{STEP_ICON[step.id]} {STEP_LABEL[step.id]}</Text>
-      <Text dimColor>{step.agent ?? 'plain Claude Code'}</Text>
-      <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />
+    <Box flexDirection="row" gap={1} flexWrap="wrap">
+      {steps.map((step, i) => {
+        const isNow = step.status === 'running' || step.status === 'gate' || step.status === 'blocked' || step.status === 'failed'
+        const color = step.status === 'blocked' || step.status === 'failed' ? 'error' : isNow ? 'warning' : step.status === 'done' ? 'success' : undefined
+        return (
+          <Box key={`step-${i}`} flexDirection="column" width={18} borderStyle="round" borderColor={color} borderDimColor={!isNow} paddingX={1}>
+            <Text wrap="truncate-end">{STEP_ICON[step.id]} {i + 1} {STEP_LABEL[step.id]}</Text>
+            <Text dimColor wrap="truncate-end">{step.agent ?? 'plain Claude Code'}</Text>
+            <Text color={STATUS_COLOR[step.status]}>{STATUS_TEXT[step.status]}</Text>
+            {step.status === 'gate' && <Text color="warning">{STATUS[step.status]}</Text>}
+            {canPick && (!run || step.status === 'waiting' || step.status === 'blocked') && <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />}
+          </Box>
+        )
+      })}
     </Box>
   )
 }
@@ -130,7 +140,7 @@ function renderPicker($: EngineInterface, e: RenderInput, step: PipeStepId, card
     <Box flexDirection="row" gap={1} flexWrap="wrap">
       <Text dimColor>{STEP_LABEL[step]} with</Text>
       <Button key="step-agent-none" label="Plain Claude Code" onPress={() => pickAgent($, step, null)} />
-      {cards.map(c => <Button key={`step-agent-${c.agent.name}`} label={c.agent.name} onPress={() => pickAgent($, step, c.agent.name)} />)}
+      {cards.map(c => renderMiniCard($, e, c, `step-agent-${c.agent.name}`, () => pickAgent($, step, c.agent.name)))}
       <Button key="step-agent-cancel" label="Cancel" variant="secondary" dimColor onPress={() => pickStep($, undefined)} />
     </Box>
   )
@@ -144,26 +154,25 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
   const size = SIZES.find(z => z.id === run.size)?.label
   const hasConfirmed = run.steps[gate]?.id === 'review' && (run.findings ?? []).some(f => f.verdict === 'confirmed')
   const blocked = run.steps.find(s => s.status === 'blocked')
+  const current = run.steps.findIndex(s => ['running', 'gate', 'blocked', 'failed'].includes(s.status))
+  // The picker closes once its step has started.
+  const isPickable = ['waiting', 'blocked'].includes(run.steps.find(s => s.id === picking)?.status ?? '')
 
   return (
     <Box flexDirection="column" gap={1}>
       <Text bold wrap="truncate-end">{kind} · {size} · {run.task}</Text>
-      {run.steps.map((step, i) => (
-        <Box key={`step-${i}`} flexDirection="column" borderStyle="round" borderColor={step.status === 'gate' ? 'warning' : undefined} paddingX={1}>
-          <Box flexDirection="row" gap={1}>
-            <Text>{STEP_ICON[step.id]} {i + 1}. {STEP_LABEL[step.id]}</Text>
-            <Text dimColor>{step.status === 'running' ? `subagent: ${run.phase === 'skeptic' ? 'skeptic' : step.id === 'review' ? 'reviewers' : (step.agent ?? 'plain Claude Code')}` : (step.agent ?? 'plain Claude Code')}</Text>
-            <Text color={STATUS_COLOR[step.status]}>{STATUS[step.status]}</Text>
-            {!run.ended && (step.status === 'waiting' || step.status === 'blocked') && <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />}
-          </Box>
-          {step.note && <Text dimColor>{step.note}</Text>}
-          {!run.ended && picking === step.id && renderPicker($, e, step.id, cards)}
-          {(step.status === 'done' || step.status === 'gate') && <Text dimColor>{fileOf(run, i)}</Text>}
-          {step.status === 'gate' && step.id === 'plan' && run.sizeNote && <Text color="warning">{run.sizeNote}</Text>}
-          {step.status === 'gate' && step.summary && <Text>{step.summary}</Text>}
-          {step.error && <Text color="error">{step.error}</Text>}
+      {renderTrack($, e, run.steps, run, !run.ended)}
+      {run.steps.filter(step => step.note).map(step => <Text key={`note-${step.id}`} dimColor>{step.note}</Text>)}
+      {!run.ended && picking && isPickable && renderPicker($, e, picking, cards)}
+      {run.steps.map((step, i) => (step.status === 'done' || step.status === 'gate') && <Text key={`file-${step.id}`} dimColor>{fileOf(run, i)}</Text>)}
+      {current >= 0 && (
+        <Box flexDirection="column" paddingX={1}>
+          {run.steps[current]!.status === 'running' && <Text dimColor>subagent: {run.phase === 'skeptic' ? 'skeptic' : run.steps[current]!.id === 'review' ? 'reviewers' : (run.steps[current]!.agent ?? 'plain Claude Code')}</Text>}
+          {run.steps[current]!.status === 'gate' && run.steps[current]!.id === 'plan' && run.sizeNote && <Text color="warning">{run.sizeNote}</Text>}
+          {run.steps[current]!.status === 'gate' && run.steps[current]!.summary && <Text>{run.steps[current]!.summary}</Text>}
+          {run.steps[current]!.error && <Text color="error">{run.steps[current]!.error}</Text>}
         </Box>
-      ))}
+      )}
       {gate >= 0 && !run.ended && (
         <Box flexDirection="column" gap={1}>
           {'Input' in elements && <elements.Input key="pipeline-note" label="Change (optional)" placeholder="what to do differently" value={note} onInput={v => update($, pipeline, p => ({ ...p, note: v }))} onSubmit={v => update($, pipeline, p => ({ ...p, note: v }))} />}
