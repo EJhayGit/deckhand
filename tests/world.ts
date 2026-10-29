@@ -16,6 +16,8 @@ export type World = {
   runs: string[][]
   fetches: { url: string; body?: string }[]
   stdout: string
+  // Output per command line (`git diff HEAD`), else `stdout`.
+  outputs: Record<string, string>
   reply: { ok: boolean; status: number; text: string } | 'refused'
   enabledPlugins: Record<string, boolean>
   spawned: { subagentType: string; description: string; prompt: string }[]
@@ -36,6 +38,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     runs: [],
     fetches: [],
     stdout: '',
+    outputs: {},
     reply: { ok: true, status: 200, text: '{}' },
     enabledPlugins: {},
     spawned: [],
@@ -65,7 +68,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   on('process.run', (_, e) => {
     w.runs.push([...e.argv])
     if (e.argv[0] === 'rm') w.files.delete(rel(e.argv[e.argv.length - 1] ?? ''))
-    return { value: { exitCode: 0, stdout: w.stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    return { value: { exitCode: 0, stdout: w.outputs[e.argv.join(' ')] ?? w.stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', (_, e) => {
     w.fetches.push({ url: e.url, body: e.init?.body })

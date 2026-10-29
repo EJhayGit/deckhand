@@ -132,8 +132,8 @@ export function after(run: PipeRun, event: PipeEvent): { run: PipeRun; next: num
   if (event.kind === 'redo') {
     const from = run.steps.findIndex(s => s.id === event.from)
     if (from < 0 || at('gate') < 0) return { run, next: null }
-    const steps = run.steps.map((s, j) => (j >= from ? { ...s, status: 'waiting' as const } : s))
-    return { run: { ...run, steps, note: event.note }, next: from }
+    const steps = run.steps.map((s, j) => (j >= from ? { ...s, status: 'waiting' as const, summary: undefined } : s))
+    return { run: { ...run, steps, note: event.note, findings: undefined }, next: from }
   }
 
   return { run: { ...run, ended: 'stopped' }, next: null }
@@ -170,17 +170,20 @@ const DO: Record<PipeStepId, Record<PipeKind, string> | string> = {
   commit: 'Commit the work: one commit per logical chunk, with plain messages. Don\'t push.',
 }
 
+export function stepHead(run: PipeRun, index: number): string {
+  return `Deckhand pipeline ${run.id}, step ${index + 1}/${run.steps.length}: ${STEP_LABEL[run.steps[index]!.id]}.
+
+Task:
+${run.task}`
+}
+
 export function stepPrompt(run: PipeRun, index: number): string {
   const step = run.steps[index]!
-  const total = run.steps.length
   const earlier = run.steps.slice(0, index).map((s, i) => (s.status === 'done' ? `- ${fileOf(run, i)}` : '')).filter(Boolean)
   const todo = typeof DO[step.id] === 'string' ? DO[step.id] as string : (DO[step.id] as Record<PipeKind, string>)[run.kind]
   const note = run.note ? `\n\nThe owner asked for a change: ${run.note}\nRedo this step with it.` : ''
 
-  return `Deckhand pipeline ${run.id}, step ${index + 1}/${total}: ${STEP_LABEL[step.id]}.
-
-Task:
-${run.task}
+  return `${stepHead(run, index)}
 
 ${FIRST[run.kind]}${earlier.length ? `\n\nRead the earlier results first:\n${earlier.join('\n')}` : ''}
 

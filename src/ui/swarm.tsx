@@ -5,7 +5,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { DeckAgent, PipeRun, PipeStep, Pipeline, SwarmDraft, SwarmMode } from '../../types'
 import { KINDS, SIZES, STEP_LABEL, fileOf, gatesText, suggestKind, suggestSize } from '../pipeline'
-import { approvePipeline, changePipeline, clearPipeline, startPipeline, stopPipeline } from '../pipelineRun'
+import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, startPipeline, stopPipeline } from '../pipelineRun'
 import { PRESETS, startSwarm } from '../swarm'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
@@ -99,6 +99,7 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
   const gate = run.steps.findIndex(s => s.status === 'gate')
   const kind = KINDS.find(k => k.id === run.kind)?.label
   const size = SIZES.find(z => z.id === run.size)?.label
+  const hasConfirmed = run.steps[gate]?.id === 'review' && (run.findings ?? []).some(f => f.verdict === 'confirmed')
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -119,7 +120,8 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
         <Box flexDirection="column" gap={1}>
           {'Input' in elements && <elements.Input key="pipeline-note" label="Change (optional)" placeholder="what to do differently" value={note} onInput={v => update($, pipeline, p => ({ ...p, note: v }))} onSubmit={v => update($, pipeline, p => ({ ...p, note: v }))} />}
           <Box flexDirection="row" gap={1}>
-            <Button key="pipeline-approve" label="Approve" variant="primary" onPress={() => approvePipeline($)} />
+            {hasConfirmed && <Button key="pipeline-fix" label="Fix these first" variant="primary" onPress={() => fixFirstPipeline($)} />}
+            <Button key="pipeline-approve" label="Approve" variant={hasConfirmed ? 'secondary' : 'primary'} onPress={() => approvePipeline($)} />
             <Button key="pipeline-change" label="Change" onPress={() => changePipeline($, note)} />
             <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />
           </Box>

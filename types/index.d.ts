@@ -75,6 +75,23 @@ export type PipeRun = {
   note?: string
   ended?: 'done' | 'stopped' | 'failed'
   error?: string
+  // Review: merged findings, and `skeptic` while the skeptic checks them.
+  findings?: Finding[]
+  phase?: 'skeptic'
+}
+
+export type Severity = 'critical' | 'high' | 'medium' | 'low'
+// pending: serious, waiting for the skeptic; advice: medium or low.
+export type Finding = {
+  id: number
+  severity: Severity
+  file: string
+  line: number
+  title: string
+  evidence: string
+  reviewers: string[]
+  verdict: 'pending' | 'confirmed' | 'refuted' | 'advice'
+  proof?: string
 }
 // The Pipeline's choices (null: take the suggestion), the run, and the last
 // run ids (the folders under .deckhand/pipeline/).
