@@ -2,62 +2,68 @@
 
 ## State
 
-- 0.2.0 is released: PR #6 merged 2026-10-28, tagged `v0.2.0` with a GitHub
-  release, MIT licensed (`LICENSE`, `"license": "MIT"` in plugin.json). The
-  marketplace install reads `main`, so it gives 0.2.0 after `/plugin update`.
-  It has 16 built-in agents,
-  plugin Set up, the new deck look, the Runs tab, optional swarms (Parallel
-  goes through the chat) and `/deck swarm`. See `PLAN.md` section 12 and
-  `docs/decisions/0004-agent-catalog-and-plugin-setup.md`,
-  `0005-swarms-and-runs-view.md`.
-- `launch/` holds a landing page with a one-page launch plan and three SVG
-  graphics, made by the first live Launch kit swarm.
-- Checks pass: `claude plugin validate .`, `tsc` (with the bundled types),
-  `claude plugin test .` (86 tests).
+- 0.2.0 is released (PR #6, tag `v0.2.0`, MIT). 0.2.1 is merged (PR #9),
+  not tagged. `band-layout` is merged (PR #11): the agent chips sit at the
+  top of the Deck tab.
+- **0.3.0 is built on branch `claude/deckhand-master-plan-f696d7`, one PR,
+  not merged.** It is `PLAN.md` section 14, all four milestones, one commit
+  each:
+  1. **Skills tab** (`src/skills.ts`, `src/ui/skills.tsx`, decision 0008):
+     lists skills from `$.command.list()`, runs one with `$.command.run`
+     (the host refuses a `/…` prompt from a plugin), pins in
+     `.claude/deckhand/skills.json`, Add to agent.
+  2. **ECC agents** (`src/agents/starters.ts`, `THIRD_PARTY_NOTICES.md`,
+     decision 0006): seven built-ins take ECC's bodies under their old ids;
+     architect and typescript-reviewer are new.
+  3. **Pipeline** (`src/pipeline.ts`, `src/pipelineRun.ts`,
+     `src/ui/swarm.tsx`, decision 0007): each step runs in the main chat with
+     its agent active; the mod saves the turn's answer to
+     `.deckhand/pipeline/<run>/<nn>-<step>.md`.
+  4. **Review + skeptic** (`src/findings.ts`, decision 0009): reviewers fan
+     out, findings merge by snippet, the new skeptic agent confirms or
+     refutes the serious ones; Fix these first.
+  Then, at the owner's request: **Lead mode and swarm-lead removed**
+  (Parallel stays), and **Auto** chips for Kind and Size (decision 0010).
+- Checks pass: `claude plugin validate .` (the usual no-icon warning), `tsc`
+  with the bundled types, `claude plugin test .` (122 tests).
+- The test world (`tests/world.ts`) now maps paths correctly inside a git
+  worktree (the worktree's own path holds `.claude/`), answers
+  `command.list` / `command.run`, and gives per-command `process.run`
+  output (`w.outputs`).
 - Live testing of unmerged changes runs from the session's dev-mod copy in
   `~/.claude/dev-mods/<session>/deckhand/` (hooks, src, types and
-  plugin.json copied from this repo), with the marketplace deckhand turned
-  off. Copy again after each change. With 0.2 merged, the marketplace
-  install can be turned back on and updated instead.
-- The repo ships project Claude Code setup: `.claude/settings.json` turns on
-  plugins from the official and `anthropics/skills` marketplaces, and
-  `.claude/agents/` has reviewer, test-writer, debugger and docs-writer (these
-  Deckhand-dev helpers were left as they are; the project reviewer replaces
-  the built-in one in this repo's deck).
-- 0.2.1 is merged (PR #9, 2026-10-28), not tagged: swarm-lead names agents
-  as `deckhand:<id>` (bare names failed with "Agent type not found"), model
-  chips read Haiku 5.5 / Sonnet 5.5 / Opus 5.5 / Fable 5.1 (ids stay
-  aliases), and the status line is cleared instead of set.
+  plugin.json), with the marketplace deckhand turned off.
 
 ## Next step
 
-- Branch `band-layout` (unmerged): the active agent's chips moved off the
-  chat into the top of the Deck tab (`src/ui/chips.tsx`); nothing draws
-  above the prompt now. One row per label (Model, Effort, Can, Repeat), with
-  Stop / Save to agent beside the agent name. Owner: check it live from the
-  dev-mod copy, then merge.
+Owner, from the dev-mod copy (marketplace deckhand off):
 
-- Owner: `/plugin update`, restart, and run a task with swarm-lead in use;
-  check that it starts deck agents and they show in Runs.
-- Owner: run one more swarm and check that steps like `2/4` show in Runs.
-  Then try Set up on frontend-designer and restart.
-- Before launch (from the swarm's review): take real screenshots, and export
-  the OG card as a PNG.
+1. **Skills:** open the Skills tab; check real skills list, Search, ☆ pin,
+   and Run on one (e.g. a document skill with a note).
+2. **Agents:** Use reviewer, then planner, on a small task; check the new
+   instructions show (longer checklists, ECC-style plan format).
+3. **Pipeline:** Swarm tab → type a small bug fix → Kind Fix, Size Normal →
+   Start (or leave both on Auto and check the reason line). Approve after Plan; let Tests and Build run; check the Review step
+   starts the reviewers and the skeptic; at the Commit stop, try Fix these
+   first or Approve. Plant a real bug to see it survive the skeptic.
+4. Merge the PR when happy.
 
 ## Open items
 
-- Confirmed live (2026-10-28): a Parallel swarm starts from the chat prompt,
-  and Runs rows show with tokens, cost and the timer moving.
-- Still to confirm live:
-  - Steps like `2/4` show, now that progress calls match by part.
-  - The `skills` names `<plugin>:<skill>` resolve once the plugins install.
-  - Set up's install prompt after a restart.
-- Model prices in `src/models.ts` (`PRICES`) are list prices from 2026-10;
-  update them with `CLAUDE_IDS` when models change.
-- `launch/` ships inside the plugin (the repo root is the plugin), about
-  90 KB. Move it out if that matters.
-- README has no screenshots: they need a live session.
-- PNG/JPG icons are wrapped in an SVG `<image>`; unverified on desktop.
-- `claude plugin validate .` warns that the plugin has no icon (a square PNG
-  at `.claude-plugin/icon.png`). That only matters for the official plugin
-  directory; `launch/graphics/icon.svg` could be exported for it.
+- Owner's open questions from the master plan, built with these defaults:
+  Lead is removed (with swarm-lead); Build and Commit use the agent in use
+  when the run started (none: plain Claude Code); the swap list as given.
+- Still to confirm live: a Pipeline turn's `turn.start` text equals the
+  submitted prompt (the swarm relies on the same match); `$.command.run` from
+  a button runs a plugin skill; the reviewers' finding lines come back as
+  plain JSON lines in the main answer.
+- The Skills tab can't tell project from personal skills (the API says only
+  `user`), so both show as Yours; a plugin's markdown commands show too.
+- `$.fs` can't delete: old `.deckhand/pipeline/` folders stay (gitignored);
+  state keeps the last 20 run ids.
+- Security triggers in `src/findings.ts` are broad (`url`, `request`,
+  `session`): they lean toward adding security-auditor.
+- Earlier items: model prices in `src/models.ts` are from 2026-10; `launch/`
+  ships in the plugin (~90 KB); README has no screenshots; PNG icons in an
+  SVG `<image>` are unverified on desktop; the plugin has no
+  `.claude-plugin/icon.png`.

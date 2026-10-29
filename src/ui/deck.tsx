@@ -15,6 +15,7 @@ import { renderChips } from './chips'
 import { renderForm } from './form'
 import { mascotSvg } from './mascot'
 import { renderRuns } from './runs'
+import { renderSkills } from './skills'
 import { COLORS, iconText, modelText, weightOf } from './status'
 import { renderSwarm } from './swarm'
 
@@ -34,6 +35,7 @@ const TABS: readonly { id: DeckTab; label: string }[] = [
   { id: 'deck', label: 'Deck' },
   { id: 'runs', label: 'Runs' },
   { id: 'swarm', label: 'Swarm' },
+  { id: 'skills', label: 'Skills' },
 ]
 
 // A function declaration: validate only follows `$` past an import into one.
@@ -43,7 +45,10 @@ export async function renderDeck($: EngineInterface, e: RenderInput) {
 
   const { Box, Text, Button } = $.ui.resolve(e)
   const now = await read($, tab)
-  const body = now === 'runs' ? await renderRuns($, e) : now === 'swarm' ? await renderSwarm($, e) : await renderCards($, e)
+  const body = now === 'runs' ? await renderRuns($, e)
+    : now === 'swarm' ? await renderSwarm($, e)
+      : now === 'skills' ? await renderSkills($, e)
+        : await renderCards($, e)
 
   return (
     <Box flexDirection="column" gap={1}>

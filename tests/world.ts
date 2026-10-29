@@ -10,14 +10,18 @@ export type World = {
   status: (string | undefined)[]
   agents: { name: string; disallowedTools?: readonly string[]; model?: string }[]
   submitted: string[]
+  ran: string[]
   aborted: string[]
   opened: string[]
   runs: string[][]
   fetches: { url: string; body?: string }[]
   stdout: string
+  // Output per command line (`git diff HEAD`), else `stdout`.
+  outputs: Record<string, string>
   reply: { ok: boolean; status: number; text: string } | 'refused'
   enabledPlugins: Record<string, boolean>
   spawned: { subagentType: string; description: string; prompt: string }[]
+  commands: { name: string; description: string; source: 'builtin' | 'plugin' | 'user' | 'mcp'; plugin?: string }[]
 }
 
 export function world(on: On, files: Record<string, string> = {}, store: Record<string, unknown> = {}): World {
@@ -28,14 +32,17 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     status: [],
     agents: [],
     submitted: [],
+    ran: [],
     aborted: [],
     opened: [],
     runs: [],
     fetches: [],
     stdout: '',
+    outputs: {},
     reply: { ok: true, status: 200, text: '{}' },
     enabledPlugins: {},
     spawned: [],
+    commands: [],
   }
   mock.store(on, store)
   known = Object.keys(files)
@@ -61,7 +68,7 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
   on('process.run', (_, e) => {
     w.runs.push([...e.argv])
     if (e.argv[0] === 'rm') w.files.delete(rel(e.argv[e.argv.length - 1] ?? ''))
-    return { value: { exitCode: 0, stdout: w.stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    return { value: { exitCode: 0, stdout: w.outputs[e.argv.join(' ')] ?? w.stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('http.fetch', (_, e) => {
     w.fetches.push({ url: e.url, body: e.init?.body })
@@ -89,6 +96,11 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     w.spawned.push({ subagentType: e.subagentType, description: e.description, prompt: e.prompt })
     return { model: 'claude-sonnet-5-5', agentId: `a${w.spawned.length}` }
   })
+  on('command.list', () => ({ value: w.commands }))
+  on('command.run', (_, e) => {
+    w.ran.push(`/${e.command}${e.args ? ` ${e.args}` : ''}`)
+    return { text: '' }
+  })
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('agent.register', (_, e) => {
     w.agents.push({ name: e.name, disallowedTools: e.disallowedTools, model: e.model })
@@ -114,9 +126,11 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
 // and other paths by their end (AGENTS.md under the project root).
 function rel(path: string): string {
   const p = path.replaceAll('\\', '/')
-  const at = p.indexOf('.claude/')
-  if (at >= 0) return p.slice(at)
-  return known.find(k => p === k || p.endsWith(`/${k}`)) ?? p
+  const file = known.find(k => p === k || p.endsWith(`/${k}`))
+  if (file) return file
+  // Last match: a worktree's own path holds .claude/ too.
+  const at = Math.max(p.lastIndexOf('.claude/'), p.lastIndexOf('.deckhand/'))
+  return at >= 0 ? p.slice(at) : p
 }
 let known: string[] = []
 

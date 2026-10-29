@@ -47,7 +47,10 @@ starter templates; `PLAN.md` wins over them. Design choices go in
   file. The contract for every key is `types/index.d.ts`.
 - Pure modules (tested without the engine): `src/agents/format.ts`,
   `src/limits.ts`, `src/repeat.ts`, `src/models.ts`, `src/gateway.ts`,
-  `src/ui/status.ts`.
+  `src/ui/status.ts`, `src/skills.ts`, `src/pipeline.ts`, `src/findings.ts`.
+- The Pipeline (`src/pipelineRun.ts`) runs each step in the main chat with
+  the step's agent active, and saves `turn.complete`'s answer as the step's
+  result file (`docs/decisions/0007-pipeline.md`).
 - An active agent applies through hooks: `prompt.compose` adds its
   instructions, `turn.step` rewrites model and effort for the main loop only
   (`e.agentId === undefined`) or answers Local/Codex turns itself, and

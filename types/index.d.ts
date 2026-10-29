@@ -53,8 +53,51 @@ export type Run = {
   steps?: { done: number; total: number }
 }
 
-export type DeckTab = 'deck' | 'runs' | 'swarm'
-export type SwarmMode = 'parallel' | 'lead'
+export type DeckTab = 'deck' | 'runs' | 'swarm' | 'skills'
+export type SkillsView = { query: string; open: string | null; note: string }
+export type SwarmMode = 'pipeline' | 'parallel'
+
+export type PipeKind = 'feature' | 'fix' | 'change' | 'cleanup'
+export type PipeSize = 'tiny' | 'small' | 'normal' | 'big'
+export type PipeStepId = 'research' | 'plan' | 'tests' | 'build' | 'review' | 'commit'
+// gate: done, waiting for the owner's OK before the run goes on.
+export type PipeStep = { id: PipeStepId; agent: string | null; status: 'waiting' | 'running' | 'done' | 'gate' | 'failed'; summary?: string; error?: string }
+// One pipeline: `owner` is the agent in use when it started, put back at the
+// end; `prompt` is the step prompt in flight, matched at its turn's end.
+export type PipeRun = {
+  id: string
+  task: string
+  kind: PipeKind
+  size: PipeSize
+  owner: string | null
+  steps: PipeStep[]
+  prompt: string | null
+  note?: string
+  ended?: 'done' | 'stopped' | 'failed'
+  error?: string
+  // Set when the plan turned out bigger than the size picked.
+  sizeNote?: string
+  // Review: merged findings, and `skeptic` while the skeptic checks them.
+  findings?: Finding[]
+  phase?: 'skeptic'
+}
+
+export type Severity = 'critical' | 'high' | 'medium' | 'low'
+// pending: serious, waiting for the skeptic; advice: medium or low.
+export type Finding = {
+  id: number
+  severity: Severity
+  file: string
+  line: number
+  title: string
+  evidence: string
+  reviewers: string[]
+  verdict: 'pending' | 'confirmed' | 'refuted' | 'advice'
+  proof?: string
+}
+// The Pipeline's choices (null: Auto, guessed from the task), the run, and the last
+// run ids (the folders under .deckhand/pipeline/).
+export type Pipeline = { kind: PipeKind | null; size: PipeSize | null; note: string; run: PipeRun | null; history: string[] }
 export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; task: string; note: string | null }
 
 // What the Deck's chips apply to this session, over the active agent's file.
@@ -83,8 +126,11 @@ declare module 'claude-code' {
       runs: Run[]
       swarm: SwarmDraft
       swarmOpen: string | null
+      pipeline: Pipeline
       setup: string | null
       enabledPlugins: string[]
+      skillsPinned: string[]
+      skillsView: SkillsView
     }
   }
 }

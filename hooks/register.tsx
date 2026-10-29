@@ -9,9 +9,11 @@ import { blockedNote, blockingLimit } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, isHiddenAgent, showStatus } from '../src/session'
+import { onPipelineTurnEnd } from '../src/pipelineRun'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { DECK, renderDeck } from '../src/ui/deck'
+import { loadPins } from '../src/ui/skills'
 
 const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as string | null)
 
@@ -26,6 +28,7 @@ export const register: Register = (on, options) => {
     await $.tool.register(PROGRESS_TOOL).catch(() => undefined)
     await clearLoop($)
     await refreshDeck($)
+    await loadPins($)
     await showStatus($)
     void $.ui.open(DECK)
 
@@ -72,6 +75,7 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       await onMainTurnEnd($, e.reason)
       await closeSwarm($, prompt)
+      await onPipelineTurnEnd($, prompt, e.reason, e.answer, e.usage)
     } else {
       await onAgentEnd($, e.agentId, e.reason)
     }

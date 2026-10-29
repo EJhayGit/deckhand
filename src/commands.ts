@@ -16,8 +16,8 @@ const repeat = atom({ plugin: 'deckhand', key: 'repeat' } as const, 'once' as Re
 
 export const COMMAND = {
   name: 'deck',
-  description: 'Open the Deck, or: use <name>, none, repeat <3|10m|30m|60m|stop>, limits, swarm <preset|lead> <task>',
-  argumentHint: '[use <name> | none | repeat <3|10m|30m|60m|stop> | limits | swarm <launch-kit|security-sweep|ship-check|lead> <task>]',
+  description: 'Open the Deck, or: use <name>, none, repeat <3|10m|30m|60m|stop>, limits, swarm <preset> <task>',
+  argumentHint: '[use <name> | none | repeat <3|10m|30m|60m|stop> | limits | swarm <launch-kit|security-sweep|ship-check> <task>]',
 }
 
 const REPEATS: Record<string, { mode: RepeatMode; text: string }> = {
@@ -85,11 +85,11 @@ export async function runDeck($: EngineInterface, args: string): Promise<string>
   }
   if (command.kind === 'swarm') {
     const preset = PRESETS.find(p => p.id === command.preset)
-    if (command.preset !== 'lead' && !preset) return `Swarm takes ${PRESETS.map(p => p.id).join(', ')} or lead, then the task.`
-    const names = preset ? Object.keys(preset.parts) : []
-    const notes = await startSwarm($, preset ? 'parallel' : 'lead', command.preset, names, command.task, true)
+    if (!preset) return `Swarm takes ${PRESETS.map(p => p.id).join(', ')}, then the task.`
+    const names = Object.keys(preset.parts)
+    const notes = await startSwarm($, command.preset, names, command.task, true)
     await $.ui.open({ ...DECK, focus: true })
-    return notes.length ? notes.join(' ') : preset ? `Asked Claude to start ${preset.label}: ${names.join(', ')}.` : 'swarm-lead has the task.'
+    return notes.length ? notes.join(' ') : `Asked Claude to start ${preset.label}: ${names.join(', ')}.`
   }
 
   return `Usage: /deck ${COMMAND.argumentHint}`

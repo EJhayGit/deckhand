@@ -22,7 +22,7 @@ A **Deck** panel opens beside the chat.
 
 ## Use it
 
-1. The Deck already holds 16 ready agents (see below). To make your own, click
+1. The Deck already holds 18 ready agents (see below). To make your own, click
    **+ New**, type a name, pick what it starts from, and click **Save**. The
    agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
    it too.
@@ -36,11 +36,14 @@ A **Deck** panel opens beside the chat.
 
 | Group | Agents |
 | --- | --- |
-| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer |
+| Core | reviewer, bug-fixer, test-runner, test-writer, docs-writer, planner, researcher, refactorer, architect, typescript-reviewer, skeptic |
 | Design | frontend-designer, ui-critic, graphics-designer |
 | Security | security-auditor, dependency-auditor, change-security-review |
 | Web | website-reviewer (give it a URL) |
-| Lead | swarm-lead |
+
+Built-in agents adapted from ECC by Affaan Mustafa: reviewer, planner,
+test-writer, security-auditor, refactorer, docs-writer, bug-fixer, architect
+and typescript-reviewer (MIT, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
 Click a group's name to fold it. A file in `.claude/agents/` with the same
 name replaces the built-in card.
@@ -53,26 +56,62 @@ uses Playwright or Chrome DevTools. Their cards say **needs …**. Click
 `.claude/settings.json`, and Claude Code offers to install them when you
 restart it. Nothing global is changed.
 
-### Swarms (optional)
+### Skills
 
-Open the **Swarm** tab to run several agents on one task:
+The **Skills** tab lists every installed skill: Pinned first, then Yours,
+then one group per plugin. Type in **Search** to filter by name or
+description. Click a skill, add an optional note, and click **Run**: it runs
+as if you typed `/<skill> <note>`. Click ☆ to pin a skill in this project
+(saved in `.claude/deckhand/skills.json`). **Add to agent** adds the skill to
+the agent in use.
 
-- **Parallel:** pick a preset (Launch kit, Security sweep, Ship check) or tick
-  agents, type the task, click **Start**. Deckhand sends a prompt to the chat
-  naming each agent and its part, and Claude starts them in the background.
-- **Lead:** swarm-lead takes the task in the chat, splits it, and hands parts
-  to the deck's agents.
+### Pipeline
 
-Or type `/deck swarm launch-kit <task>` or `/deck swarm lead <task>`.
+The **Swarm** tab opens on **Pipeline**: a task runs through steps, each
+building on the last one's result, and it stops for your OK.
+
+1. Type the task. **Kind** (Feature, Fix, Change, Clean up) and **Size**
+   start on **Auto**: Deckhand guesses them from your words and says why, for
+   example `Auto: Fix · Normal (mentions login)`. Click another chip to pick
+   one yourself, or **Auto** to go back. If the plan names more files than a
+   Normal run should, the first stop says the size was bumped to Big.
+2. Click **Start**.
+
+| Size | Steps | Stops for your OK |
+| --- | --- | --- |
+| Tiny | Build → Review → Commit | before Commit |
+| Small | Tests → Build → Review → Commit | before Commit |
+| Normal | Plan → Tests → Build → Review → Commit | after Plan, before Commit |
+| Big | Research → Plan → Tests → Build → Review → Commit | after Plan, before Commit |
+
+Each step runs in the chat as your own prompt, with that step's agent in use
+(planner or architect, test-writer, reviewer), so its limits hold. Build and
+Commit use the agent you had in use. Each answer is saved to
+`.deckhand/pipeline/<run>/` and the next step reads it. At a stop, click
+**Approve**, **Change** (type a note; the step runs again with it) or
+**Stop**.
+
+**Review** starts reviewer, plus typescript-reviewer for TypeScript and
+security-auditor for security-sensitive changes, merges their duplicate
+findings, and has the skeptic agent re-check every serious one. Only findings
+it proves stay; medium and low ones show as advice. If any are confirmed,
+**Fix these first** sends Build back with them, then Review again.
+
+### Parallel
+
+The Swarm tab's other mode runs several agents at once on separate jobs: pick
+a preset (Launch kit, Security sweep, Ship check) or tick agents, type the
+task, click **Start**. Deckhand sends a prompt to the chat naming each agent
+and its part, and Claude starts them in the background. Or type
+`/deck swarm launch-kit <task>`.
 
 Each agent in a swarm keeps its own limits: Claude Code holds it to the tools
-its file allows. The chips' limits apply to the agent you clicked
-**Use** on; swarm-lead allows everything so its helpers aren't blocked.
+its file allows.
 
 ### Runs
 
-The **Runs** tab shows every agent this session started, from a swarm or from
-Claude: its model and effort, steps, context use, tokens, estimated cost, time
+The **Runs** tab shows every agent this session started, from a swarm, a
+pipeline step (tagged like `Pipeline 3/5 · Tests`) or Claude: its model and effort, steps, context use, tokens, estimated cost, time
 and a progress bar, with totals on top. Cost is an estimate from list prices.
 
 ### The chips
@@ -107,7 +146,7 @@ library, and Delete (asks first). Library agents show in every project; use
 | `/deck repeat 3` / `10m` / `30m` / `60m` | Repeats your next prompt |
 | `/deck repeat stop` | Stops a loop |
 | `/deck limits` | Shows what the active agent may do |
-| `/deck swarm <launch-kit\|security-sweep\|ship-check\|lead> <task>` | Starts a swarm |
+| `/deck swarm <launch-kit\|security-sweep\|ship-check> <task>` | Starts a Parallel swarm |
 
 ### Local models and Codex
 
@@ -175,4 +214,5 @@ the first time it loads the mod (see `docs/decisions/0001-hooks-import-and-turn-
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Third-party credits are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+- **Skills tab:** every installed skill, grouped and searchable. Run one with
+  a note, pin favorites per project, or add one to the agent in use.
+- **Built-in agents adapted from ECC** (MIT, Affaan Mustafa): reviewer,
+  planner, test-writer, security-auditor, refactorer, docs-writer and
+  bug-fixer get ECC's fuller checklists; architect and typescript-reviewer are
+  new. Ids are unchanged. Credits in `THIRD_PARTY_NOTICES.md`.
+- **Pipeline** is the Swarm tab's main mode: kind and size chips, ordered
+  steps that build on each other, result files in `.deckhand/pipeline/`, and
+  stops for your OK after Plan and before Commit. Parallel stays.
+- **Auto Kind and Size:** both start on Auto, guessed from the task's words
+  with the reason shown under the chips. A plan naming 6+ files bumps Normal
+  to Big.
+- **Lead mode and the swarm-lead agent are removed:** Pipeline does the same
+  job with your OK at each stop, and swarm-lead needed every limit on.
+  `/deck swarm lead` is gone too.
+- **Review with a skeptic:** reviewers run side by side, duplicate findings
+  merge, and the new skeptic agent must prove each serious one or it is
+  dropped. **Fix these first** sends Build back.
+
 ## 0.2.1 (2026-10-28)
 
 - swarm-lead now calls deck agents by their full type (`deckhand:reviewer`,
