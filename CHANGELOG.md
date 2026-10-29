@@ -10,8 +10,10 @@
   new. Ids are unchanged. Credits in `THIRD_PARTY_NOTICES.md`.
 - **Pipeline** is the Swarm tab's main mode: kind and size chips, ordered
   steps that build on each other, result files in `.deckhand/pipeline/`, and
-  stops for your OK after Plan and before Commit. Parallel stays; Lead moves
-  under More.
+  stops for your OK after Plan and before Commit. Parallel stays.
+- **Lead mode and the swarm-lead agent are removed:** Pipeline does the same
+  job with your OK at each stop, and swarm-lead needed every limit on.
+  `/deck swarm lead` is gone too.
 - **Review with a skeptic:** reviewers run side by side, duplicate findings
   merge, and the new skeptic agent must prove each serious one or it is
   dropped. **Fix these first** sends Build back.

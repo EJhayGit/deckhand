@@ -311,7 +311,7 @@ Built on branch `build-v2` after 0.1.0 and merged as PR #6. Details and reasons 
 
 v0.3 (section 14) adds the Skills tab, ECC-adapted built-ins (plus architect,
 typescript-reviewer and skeptic), and the Pipeline as the Swarm tab's main
-mode; Parallel stays and Lead moves under More.
+mode; Parallel stays. Lead and swarm-lead are removed.
 
 ## 13. Working rules for the building agent
 
@@ -509,6 +509,6 @@ The Review step runs several reviewers side by side, merges their duplicate find
 
 **Open questions for the owner**
 
-- [ ] Keep Lead under "More", or remove it?
+- [x] Keep Lead under "More", or remove it? Removed, with swarm-lead (2026-10-29).
 - [ ] Should Pipeline's Build step use the active agent or always a fixed one?
 - [ ] Any agent to add to or drop from the swap list in Milestone 2?

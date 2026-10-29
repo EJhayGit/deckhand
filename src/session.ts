@@ -39,11 +39,11 @@ export async function current($: EngineInterface): Promise<{ card: DeckAgent; ch
 }
 
 // Built-in agents stay out of the model's agent list, so they cost no tokens,
-// except while swarm-lead is in use or a swarm prompt is starting them.
+// except while a swarm or review prompt is starting them.
 export async function isHiddenAgent($: EngineInterface, agentType: string): Promise<boolean> {
   const card = (await read($, deck)).find(c => c.agentType === agentType)
 
-  return card?.source === 'builtin' && (await read($, active)) !== 'swarm-lead' && (await read($, swarmOpen)) === null
+  return card?.source === 'builtin' && (await read($, swarmOpen)) === null
 }
 
 // The Deck pane already shows the agent, so the status line stays clear.

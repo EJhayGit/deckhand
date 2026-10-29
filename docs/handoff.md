@@ -49,8 +49,8 @@ Owner, from the dev-mod copy (marketplace deckhand off):
 ## Open items
 
 - Owner's open questions from the master plan, built with these defaults:
-  Lead stays under More; Build and Commit use the agent in use when the run
-  started (none: plain Claude Code); the swap list as given.
+  Lead is removed (with swarm-lead); Build and Commit use the agent in use
+  when the run started (none: plain Claude Code); the swap list as given.
 - Still to confirm live: a Pipeline turn's `turn.start` text equals the
   submitted prompt (the swarm relies on the same match); `$.command.run` from
   a button runs a plugin skill; the reviewers' finding lines come back as

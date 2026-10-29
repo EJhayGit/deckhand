@@ -22,7 +22,7 @@ A **Deck** panel opens beside the chat.
 
 ## Use it
 
-1. The Deck already holds 19 ready agents (see below). To make your own, click
+1. The Deck already holds 18 ready agents (see below). To make your own, click
    **+ New**, type a name, pick what it starts from, and click **Save**. The
    agent is saved to `.claude/agents/<name>.md`, so plain Claude Code can use
    it too.
@@ -40,7 +40,6 @@ A **Deck** panel opens beside the chat.
 | Design | frontend-designer, ui-critic, graphics-designer |
 | Security | security-auditor, dependency-auditor, change-security-review |
 | Web | website-reviewer (give it a URL) |
-| Lead | swarm-lead |
 
 Built-in agents adapted from ECC by Affaan Mustafa: reviewer, planner,
 test-writer, security-auditor, refactorer, docs-writer, bug-fixer, architect
@@ -95,21 +94,16 @@ findings, and has the skeptic agent re-check every serious one. Only findings
 it proves stay; medium and low ones show as advice. If any are confirmed,
 **Fix these first** sends Build back with them, then Review again.
 
-### Parallel and Lead
+### Parallel
 
-The Swarm tab's other modes run several agents at once:
-
-- **Parallel:** pick a preset (Launch kit, Security sweep, Ship check) or tick
-  agents, type the task, click **Start**. Deckhand sends a prompt to the chat
-  naming each agent and its part, and Claude starts them in the background.
-- **Lead** (under More): swarm-lead takes the task in the chat, splits it,
-  and hands parts to the deck's agents.
-
-Or type `/deck swarm launch-kit <task>` or `/deck swarm lead <task>`.
+The Swarm tab's other mode runs several agents at once on separate jobs: pick
+a preset (Launch kit, Security sweep, Ship check) or tick agents, type the
+task, click **Start**. Deckhand sends a prompt to the chat naming each agent
+and its part, and Claude starts them in the background. Or type
+`/deck swarm launch-kit <task>`.
 
 Each agent in a swarm keeps its own limits: Claude Code holds it to the tools
-its file allows. The chips' limits apply to the agent you clicked
-**Use** on; swarm-lead allows everything so its helpers aren't blocked.
+its file allows.
 
 ### Runs
 
@@ -149,7 +143,7 @@ library, and Delete (asks first). Library agents show in every project; use
 | `/deck repeat 3` / `10m` / `30m` / `60m` | Repeats your next prompt |
 | `/deck repeat stop` | Stops a loop |
 | `/deck limits` | Shows what the active agent may do |
-| `/deck swarm <launch-kit\|security-sweep\|ship-check\|lead> <task>` | Starts a swarm |
+| `/deck swarm <launch-kit\|security-sweep\|ship-check> <task>` | Starts a Parallel swarm |
 
 ### Local models and Codex
 

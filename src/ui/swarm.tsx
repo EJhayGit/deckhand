@@ -1,5 +1,5 @@
 // The Swarm tab: Pipeline (a task through ordered steps with stops for your
-// OK), Parallel (quick fan-out), and Lead under More.
+// OK) and Parallel (quick fan-out).
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
@@ -15,7 +15,6 @@ const pipeline = atom({ plugin: 'deckhand', key: 'pipeline' } as const, { kind: 
 const MODES: readonly { id: SwarmMode; label: string; hint: string }[] = [
   { id: 'pipeline', label: 'Pipeline', hint: 'Steps one after another, each building on the last, with stops for your OK.' },
   { id: 'parallel', label: 'Parallel', hint: 'Each picked agent starts now on its own part, in the background.' },
-  { id: 'lead', label: 'Lead', hint: 'swarm-lead takes the task in the chat, splits it and hands parts to deck agents.' },
 ]
 
 const STATUS: Record<PipeStep['status'], string> = { waiting: 'waiting', running: 'running', done: 'done', gate: 'needs OK', failed: 'failed' }
@@ -33,6 +32,8 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
     <Button key={key} label={label} variant={isOn ? 'primary' : 'secondary'} dimColor={!isOn} onPress={() => void press()} />
   )
   const hasInput = 'Input' in elements
+  // A draft saved while Lead existed opens as Pipeline.
+  const mode: SwarmMode = s.mode === 'parallel' ? 'parallel' : 'pipeline'
   const kind = p.kind ?? suggestKind(s.task)
   const size = p.size ?? suggestSize(s.task)
 
@@ -40,20 +41,18 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="row" gap={1} flexWrap="wrap">
         <Text dimColor>Mode</Text>
-        {MODES.filter(m => m.id !== 'lead').map(m => chip(`mode-${m.id}`, m.label, s.mode === m.id, () => set({ mode: m.id })))}
-        <Text dimColor>More</Text>
-        {chip('mode-lead', 'Lead', s.mode === 'lead', () => set({ mode: 'lead' }))}
+        {MODES.map(m => chip(`mode-${m.id}`, m.label, mode === m.id, () => set({ mode: m.id })))}
       </Box>
-      <Text dimColor>{MODES.find(m => m.id === s.mode)?.hint}</Text>
-      {s.mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note)}
-      {!(s.mode === 'pipeline' && p.run) && (
+      <Text dimColor>{MODES.find(m => m.id === mode)?.hint}</Text>
+      {mode === 'pipeline' && p.run && renderRun($, e, p.run, p.note)}
+      {!(mode === 'pipeline' && p.run) && (
         <Box flexDirection="column" gap={1}>
           {hasInput ? (
             <elements.Input key="swarm-task" label="Task" rows={3} placeholder="Fix the login redirect loop" value={s.task} onInput={v => set({ task: v })} onSubmit={v => set({ task: v })} />
           ) : (
             <Text dimColor>Type the task on the desktop app or the terminal.</Text>
           )}
-          {s.mode === 'pipeline' && (
+          {mode === 'pipeline' && (
             <Box flexDirection="column" gap={1}>
               <Box flexDirection="row" gap={1} flexWrap="wrap">
                 <Text dimColor>Kind</Text>
@@ -66,7 +65,7 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
               <Text dimColor>{gatesText(size)}</Text>
             </Box>
           )}
-          {s.mode === 'parallel' && (
+          {mode === 'parallel' && (
             <Box flexDirection="column" gap={1}>
               <Box flexDirection="row" gap={1} flexWrap="wrap">
                 <Text dimColor>Preset</Text>
@@ -85,7 +84,7 @@ export async function renderSwarm($: EngineInterface, e: RenderInput) {
           )}
           {s.note && <Text color="warning">{s.note}</Text>}
           <Box flexDirection="row" gap={1}>
-            <Button key="swarm-start" label={s.mode === 'pipeline' ? 'Start' : s.mode === 'lead' ? 'Start lead' : `Start ${s.picked.length} agents`} variant="primary" onPress={() => start($)} />
+            <Button key="swarm-start" label={mode === 'pipeline' ? 'Start' : `Start ${s.picked.length} agents`} variant="primary" onPress={() => start($)} />
           </Box>
         </Box>
       )}
@@ -143,9 +142,9 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
 async function start($: EngineInterface) {
   const s = await read($, swarm)
   const p = await read($, pipeline)
-  const notes = s.mode === 'pipeline'
-    ? await startPipeline($, s.task, p.kind ?? suggestKind(s.task), p.size ?? suggestSize(s.task))
-    : await startSwarm($, s.mode, s.preset, s.picked, s.task)
+  const notes = s.mode === 'parallel'
+    ? await startSwarm($, s.preset, s.picked, s.task)
+    : await startPipeline($, s.task, p.kind ?? suggestKind(s.task), p.size ?? suggestSize(s.task))
   await update($, swarm, d => ({ ...d, note: notes.length ? notes.join(' ') : null }))
   if (notes.length) $.ui.toast(notes.join(' '))
 }

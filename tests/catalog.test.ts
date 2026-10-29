@@ -54,7 +54,7 @@ test('read-only built-ins say they change nothing', () => {
 const IDS = [
   'reviewer', 'bug-fixer', 'test-runner', 'test-writer', 'docs-writer', 'planner', 'researcher', 'refactorer',
   'architect', 'typescript-reviewer', 'frontend-designer', 'ui-critic', 'graphics-designer', 'security-auditor',
-  'dependency-auditor', 'change-security-review', 'website-reviewer', 'swarm-lead',
+  'dependency-auditor', 'change-security-review', 'website-reviewer',
 ]
 
 test('every earlier built-in id is still there, plus architect and typescript-reviewer', () => {

@@ -1,7 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parallelPrompt } from '../src/swarm'
-import { STARTERS } from '../src/agents/starters'
 import { PANE, START, turnEnds, world } from './world'
 
 const OFFER = { agent: 'deckhand:reviewer', description: '', source: 'plugin', provider: { plugin: 'deckhand', tier: 'user' } } as never
@@ -64,32 +63,22 @@ test('Custom picks ask only for the picked agents, a project one by its file nam
   await ui.unmount()
 })
 
-test("every agent swarm-lead names is a registered agent type, with its prefix", async ($, on) => {
-  const w = world(on)
-  await $.session.start(START)
-  const body = STARTERS.find(s => s.id === 'swarm-lead')!.agent.body
-  const named = [...body.matchAll(/deckhand:([\w-]+)/g)].map(m => m[0])
-  const registered = w.agents.map(a => `deckhand:${a.name}`)
-
-  expect(named.length).toBeGreaterThan(0)
-  for (const type of named) expect(registered).toContain(type)
-})
-
-test('Lead makes swarm-lead active and sends the task to the chat', async ($, on) => {
+test('a draft saved while Lead existed opens and starts as a Pipeline', async ($, on) => {
   const w = world(on)
   mock.clock(on)
+  // The swarm draft reads back as one an older version saved, in Lead mode.
+  on('state.get', { plugin: 'deckhand', key: 'swarm' } as never, async (_, e, next) => {
+    const read = await next(e)
+    return { ...read, value: { ...(read as { value: { version: number } }).value, value: { preset: 'launch-kit', picked: [], mode: 'lead', task: 'Add dark mode', note: null } } } as never
+  })
   await $.session.start(START)
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
   await ui.press({ key: 'tab-swarm' })
-  await ui.press({ key: 'mode-lead' })
-  await ui.input({ key: 'swarm-task', text: 'Ship the launch kit' })
+  expect(await ui.find({ key: 'mode-lead' })).toBeUndefined()
   await ui.press({ key: 'swarm-start' })
-
-  expect(w.submitted).toEqual(['Ship the launch kit'])
-  await ui.press({ key: 'tab-deck' })
-  expect(await ui.find({ type: 'Text', text: /swarm-lead/ })).toBeDefined()
-  // While the lead is in use, the built-ins are offered to the model.
-  expect(await $.agent.offer(OFFER)).not.toEqual({ isOffered: false })
+  expect(w.submitted[0]).toContain('Deckhand pipeline')
+  // The task came from the seeded draft, so the old Lead draft was read.
+  expect(w.submitted[0]).toContain('Add dark mode')
   await ui.unmount()
 })

@@ -55,7 +55,7 @@ export type Run = {
 
 export type DeckTab = 'deck' | 'runs' | 'swarm' | 'skills'
 export type SkillsView = { query: string; open: string | null; note: string }
-export type SwarmMode = 'pipeline' | 'parallel' | 'lead'
+export type SwarmMode = 'pipeline' | 'parallel'
 
 export type PipeKind = 'feature' | 'fix' | 'change' | 'cleanup'
 export type PipeSize = 'tiny' | 'small' | 'normal' | 'big'

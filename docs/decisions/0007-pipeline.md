@@ -29,7 +29,10 @@ OK after Plan and before Commit (`PLAN.md` 14, Milestone 3).
   (none: plain Claude Code). That agent is put back when the run ends.
 - **Runs** gets a row per step, like `Pipeline 3/5 · Tests`, with the turn's
   tokens and cost.
-- **Modes:** Pipeline (default), Parallel, and Lead under More.
+- **Modes:** Pipeline (default) and Parallel. Lead and the swarm-lead agent
+  were removed (owner's choice, 2026-10-29): Pipeline covers the same ground
+  with the owner's OK, and swarm-lead needed every limit on so its workers
+  weren't blocked. A swarm draft saved in Lead mode opens as Pipeline.
 
 ## Limits of this build
 

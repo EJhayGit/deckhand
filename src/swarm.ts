@@ -1,12 +1,11 @@
-// Swarms: several agents on one task. Both modes go through the chat as the
+// Parallel swarms: several agents on one task. It goes through the chat as the
 // person's own prompt, so the request is in the transcript (auto mode refuses
 // an Agent call nothing asked for) and Claude starts the agents itself.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { DeckAgent, DeckTab, SwarmMode } from '../types'
+import type { DeckAgent, DeckTab } from '../types'
 import { routeOf } from './models'
-import { useAgent } from './session'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
 const tab = atom({ plugin: 'deckhand', key: 'tab' } as const, 'deck' as DeckTab)
@@ -95,18 +94,8 @@ export async function startParallel($: EngineInterface, presetId: string, names:
   return notes
 }
 
-// The lead runs as the active agent so its delegations show in the chat.
-export async function startLead($: EngineInterface, task: string, later = false): Promise<string[]> {
-  if (!(await useAgent($, 'swarm-lead'))) return ['There is no swarm-lead agent in the deck.']
-  await update($, tab, () => 'runs' as DeckTab)
-  await send($, task, later)
-
-  return []
-}
-
-export async function startSwarm($: EngineInterface, mode: SwarmMode, presetId: string, names: readonly string[], task: string, later = false): Promise<string[]> {
+export async function startSwarm($: EngineInterface, presetId: string, names: readonly string[], task: string, later = false): Promise<string[]> {
   if (task.trim() === '') return ['Type the task first.']
-  if (mode === 'lead') return startLead($, task, later)
   if (names.length === 0) return ['Pick at least one agent.']
 
   return startParallel($, presetId, names, task, later)
