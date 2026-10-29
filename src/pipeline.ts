@@ -116,7 +116,7 @@ export const NEEDS: Record<PipeStepId, readonly Limit[]> = {
   tests: ['edit', 'run'],
   build: ['edit', 'run'],
   review: [],
-  commit: ['edit', 'run'],
+  commit: ['run'],
 }
 
 // The deck's agents by name, with their limits.
@@ -124,6 +124,7 @@ export type Installed = Readonly<Record<string, Limits>>
 
 // Build falls back to the builder when the agent in use can't edit and run.
 const BUILDER = 'builder'
+const COMMITTER = 'committer'
 
 function can(limits: Limits | undefined, step: PipeStepId): boolean {
   return limits !== undefined && NEEDS[step].every(l => limits[l])
@@ -131,9 +132,9 @@ function can(limits: Limits | undefined, step: PipeStepId): boolean {
 
 // A step's default agent (null: plain Claude Code), with a note when the
 // default isn't installed. Build takes the agent in use if it can edit and
-// run, else the builder; Commit is always plain Claude Code.
+// run, else the builder; Commit takes the committer.
 export function agentFor(step: PipeStepId, size: PipeSize, owner: string | null, installed: Installed): { agent: string | null; note?: string } {
-  if (step === 'commit') return { agent: null }
+  if (step === 'commit') return can(installed[COMMITTER], step) ? { agent: COMMITTER } : { agent: null, note: 'No committer agent installed: plain Claude Code commits.' }
   if (step === 'build') {
     if (owner !== null && can(installed[owner], step)) return { agent: owner }
     return can(installed[BUILDER], step) ? { agent: BUILDER } : { agent: null, note: 'No builder agent installed: plain Claude Code builds.' }
@@ -173,12 +174,12 @@ export function typeOf(agent: string | null, cards: readonly { name: string; age
   return cards.find(c => c.name === agent)?.agentType ?? `deckhand:${agent}`
 }
 
-// Send through chat: asks the main chat to start the step's subagent, for
-// when Claude Code refused Deckhand's own start.
+// A step as sent to the chat: start the step's agent and wait for it.
+// Deckhand reads the agent's own answer, so the chat only says Done.
 export function chatPrompt(type: string, body: string): string {
-  return `Start the \`${type}\` agent now with one Agent call (subagent_type \`${type}\`), giving it
-the instructions below exactly. Do none of the work yourself. When it
-finishes, your whole final answer is its final answer, unchanged.
+  return `Start the \`${type}\` agent now with one Agent call (subagent_type \`${type}\`), not in
+the background, giving it the instructions below exactly. Do none of the work
+yourself. When it has finished, reply only: Done. Deckhand reads its answer itself.
 
 ${body}`
 }
@@ -292,7 +293,7 @@ const FIRST: Record<PipeKind, string> = {
 }
 
 const DO: Record<PipeStepId, Record<PipeKind, string> | string> = {
-  research: 'Research what this task needs: prior art, the docs and APIs involved, pitfalls. Change nothing. Answer with findings and dated sources.',
+  research: 'Search the web for what this task needs: prior art, the docs and APIs involved, known pitfalls. Don\'t look for the code: the Plan step reads it. Answer with findings and dated sources.',
   plan: {
     feature: 'Make the plan: a numbered task list of thin slices, each naming its files and how to check it. Change nothing.',
     fix: 'Make the plan: first the failing test that reproduces the bug, then the root cause, then a numbered list of thin fix slices with files and checks. Change nothing.',
@@ -314,7 +315,7 @@ const DO: Record<PipeStepId, Record<PipeKind, string> | string> = {
     cleanup: 'Clean up in small batches, running the tests after each. They must stay green. Don\'t commit: the Commit step does that.',
   },
   review: 'Review the change for real bugs and risks, most serious first. Change nothing.',
-  commit: 'Commit the work: one commit per logical chunk, with plain messages. Don\'t push.',
+  commit: 'Commit the work: one commit per logical chunk, with messages in the style of this repo\'s git log. Don\'t push.',
 }
 
 export function stepHead(run: PipeRun, index: number): string {

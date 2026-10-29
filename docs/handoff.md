@@ -2,21 +2,34 @@
 
 ## State
 
-- 0.3.2 is merged (PR #14), tagged `v0.3.2` with a GitHub release, and is
-  the marketplace install.
-- **0.3.3 is on branch `claude/builder-agent`, one PR, not merged:** a new
-  built-in `builder` agent (`src/agents/starters.ts`, from the owner's
-  `builder.md`, adapted from ECC and credited in `THIRD_PARTY_NOTICES.md`).
-  Build's fallback in `agentFor` (`src/pipeline.ts`) is now the builder
-  instead of fixer / bug-fixer.
+- 0.3.3 (builder agent) is merged (PR #15) and tagged `v0.3.3`.
+- **0.4.0 is on branch `claude/swarm-pipeline-issues-b16336`, one PR, not
+  merged** (`docs/decisions/0013-pipeline-through-chat.md`):
+  - Every Pipeline step goes through the chat. The step's agent is captured
+    in the `agent.spawn` hook and only its own answer finishes the step
+    (Deckhand asks for the foreground; the desktop app runs it in the
+    background anyway, and the step still waits). This fixes the live bug where Plan said "needs
+    OK" while the architect was still running in the background. Send
+    through chat is gone.
+  - New built-ins: committer (the Commit step's agent), code-explorer,
+    silent-failure-hunter, code-simplifier (from ECC `25278e7`). Researcher
+    is web only (explicit `tools`). docs-writer gets Run commands. builder no
+    longer commits per slice.
+  - The agent in use is told which tools are off (`offText`).
+  - The Deck title shows the version from the plugin's `plugin.json`.
 - Checks pass: `claude plugin validate .` (the usual no-icon warning), `tsc`
-  with the bundled types, `claude plugin test .` (137 tests).
+  with the bundled types, `claude plugin test .` (141 tests). The test world
+  plays the chat's part (`playChat`, `agentEnds` in `tests/world.ts`).
 - The test world (`tests/world.ts`) now maps paths correctly inside a git
   worktree (the worktree's own path holds `.claude/`), answers
   `command.list` / `command.run`, and gives per-command `process.run`
   output (`w.outputs`). It also answers a plugin's own `$.agent.spawn`,
   which the test engine sends shaped like the Agent tool (`subagent_type`
   in, `result.agentId` out), and `w.spawnDeny` makes it refuse.
+- **Confirmed live 2026-10-29:** a Normal run in a throwaway repo
+  (`C:\Development\Projects\deckhand-sandbox`, safe to delete) built a
+  landing page through all five steps, waiting for each agent, and the
+  committer made two clean commits. Details in decision 0013.
 - Live testing of unmerged changes runs from the session's dev-mod copy in
   `~/.claude/dev-mods/<session>/deckhand/` (hooks, src, types and
   plugin.json), with the marketplace deckhand turned off.
@@ -26,31 +39,29 @@
 Owner, from the dev-mod copy, with the marketplace deckhand turned off (it's
 0.3.1, and two copies fight):
 
-1. Deck: **Use** researcher. Swarm tab: type a small task, pick **Small**,
-   click **Start**.
-2. Nothing is typed into the chat. The Runs tab shows `Pipeline 1/4 · Tests`
-   (test-writer) working, then Build (builder). The Deck still says
-   researcher.
-3. If a step shows "Claude Code didn't start …", auto mode refused the spawn:
-   click **Send through chat** and tell me, because that changes the design.
-4. Merge the PR when happy.
+The live run passed. Merge PR #16 when happy, then tag `v0.4.0`.
+
+Possible follow-up: Review gets an empty diff when every file is new; adding
+untracked files to the saved diff (`git add -N` or `git diff --no-index`)
+would give the reviewers the real text.
 
 ## Open items
 
 - Owner's open questions from the master plan, built with these defaults:
   Lead is removed (with swarm-lead); the swap list as given. Build now uses
   the agent in use only if it can edit and run (decision 0011).
-- Live unknowns for 0.3.2: whether auto mode allows a plugin's
-  `$.agent.spawn` from a button, and whether the live result carries
-  `agentId` as documented (the test engine returns it in `result`). Stop
-  can't kill a running subagent; its late answer is ignored.
+- Live: auto mode refuses the plugin's own `$.agent.spawn` from Start, so
+  0.4.0 sends every step through the chat (works). The `background: false`
+  rewrite is ignored by the desktop app; harmless. Stop can't kill a running
+  agent; its late answer is ignored.
+- silent-failure-hunter isn't in Review's reviewer list; add it there if the
+  owner wants it to run on every Review.
 - "Changed nothing" compares `git status` + `git diff HEAD` before and after
   Tests/Build; gitignored-only changes count as nothing, and Commit isn't
   checked. Still to confirm live that the guard's denial reaches the step.
-- Still to confirm live: a Pipeline turn's `turn.start` text equals the
-  submitted prompt (the swarm relies on the same match); `$.command.run` from
-  a button runs a plugin skill; the reviewers' finding lines come back as
-  plain JSON lines in the main answer.
+- Still to confirm live: `$.command.run` from
+  a button runs a plugin skill; each reviewer's own answer is only its
+  finding lines (the chat passes them that instruction).
 - The Skills tab can't tell project from personal skills (the API says only
   `user`), so both show as Yours; a plugin's markdown commands show too.
 - `$.fs` can't delete: old `.deckhand/pipeline/` folders stay (gitignored);

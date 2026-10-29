@@ -5,11 +5,11 @@ import { refreshDeck } from '../src/agents/library'
 import { gatewayOptions } from '../src/gateway'
 import { codexAnswer, localAnswer } from '../src/gatewayTurn'
 import { COMMAND, runDeck } from '../src/commands'
-import { blockedNote, blockingLimit, limitsFor } from '../src/limits'
+import { blockedNote, blockingLimit, limitsFor, offText } from '../src/limits'
 import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, isHiddenAgent, loopAgent, showStatus } from '../src/session'
-import { onPipelineAgentEnd, onPipelineBlocked, onPipelineTurnEnd } from '../src/pipelineRun'
+import { onPipelineAgentEnd, onPipelineBlocked, onPipelineSpawn, onPipelineTurnEnd, pipelineSpawnTitle } from '../src/pipelineRun'
 import { closeSwarm } from '../src/swarm'
 import { PROGRESS_TOOL, onAgentEnd, onProgress, onSpawned, onStep } from '../src/tracker'
 import { DECK, renderDeck } from '../src/ui/deck'
@@ -45,17 +45,22 @@ export const register: Register = (on, options) => {
     const now = await current($)
     if (!now || now.card.agent.body.trim() === '') return composed
     const skills = now.card.agent.skills?.length ? `\n\nUse these skills when they apply: ${now.card.agent.skills.join(', ')}.` : ''
-    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}${skills}`
+    const off = offText(now.chips.limits)
+    const text = `You are working as the "${now.card.agent.name}" agent. Follow these instructions:\n\n${now.card.agent.body}${skills}${off ? `\n\n${off}` : ''}`
 
     return { sections: [...composed.sections, { id: 'deckhand:agent', text, scope: 'session' as const }] }
   })
 
   on('agent.offer', async ($, e, next) => ((await isHiddenAgent($, e.agent)) ? { isOffered: false } : next(e)))
 
-  // Every agent that starts gets a row in the Runs view.
+  // Every agent that starts gets a row in the Runs view. A Pipeline step's
+  // agent runs in the foreground, so its chat turn waits for it.
   on('agent.spawn', async ($, e, next) => {
-    const started = await next(e)
-    if (!started.deny && started.agentId && !e.resume) await onSpawned($, started.agentId, e.subagentType, e.description, started.model)
+    const step = e.resume ? undefined : await pipelineSpawnTitle($, e.parentAgentId, prompt, e.subagentType)
+    const spawn = step ? { ...e, background: false, description: step } : e
+    const started = await next(spawn)
+    if (!started.deny && started.agentId && !e.resume) await onSpawned($, started.agentId, e.subagentType, spawn.description, started.model)
+    if (step && !started.deny && started.agentId) await onPipelineSpawn($, started.agentId, e.parentAgentId, prompt)
 
     return started
   })
@@ -75,7 +80,7 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       await onMainTurnEnd($, e.reason)
       await closeSwarm($, prompt)
-      await onPipelineTurnEnd($, prompt, e.reason, e.answer, e.usage)
+      await onPipelineTurnEnd($, prompt, e.reason)
     } else {
       await onAgentEnd($, e.agentId, e.reason)
       await onPipelineAgentEnd($, e.agentId, e.reason, e.answer)

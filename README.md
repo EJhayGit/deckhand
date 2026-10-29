@@ -36,14 +36,18 @@ A **Deck** panel opens beside the chat.
 
 | Group | Agents |
 | --- | --- |
-| Core | reviewer, bug-fixer, builder, test-runner, test-writer, docs-writer, planner, researcher, refactorer, architect, typescript-reviewer, skeptic |
+| Core | reviewer, bug-fixer, builder, committer, test-runner, test-writer, docs-writer, planner, researcher (web only), refactorer, architect, typescript-reviewer, skeptic, code-explorer, silent-failure-hunter, code-simplifier |
 | Design | frontend-designer, ui-critic, graphics-designer |
 | Security | security-auditor, dependency-auditor, change-security-review |
 | Web | website-reviewer (give it a URL) |
 
 Built-in agents adapted from ECC by Affaan Mustafa: reviewer, planner,
-test-writer, security-auditor, refactorer, docs-writer, bug-fixer, architect
-and typescript-reviewer (MIT, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+test-writer, security-auditor, refactorer, docs-writer, bug-fixer, architect,
+typescript-reviewer, builder, committer, code-explorer, silent-failure-hunter
+and code-simplifier (MIT, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+
+The panel's title shows the Deckhand version you are running, like
+`Deck v0.4.0`.
 
 Click a group's name to fold it. A file in `.claude/agents/` with the same
 name replaces the built-in card.
@@ -84,16 +88,18 @@ building on the last one's result, and it stops for your OK.
 | Normal | Plan → Tests → Build → Review → Commit | after Plan, before Commit |
 | Big | Research → Plan → Tests → Build → Review → Commit | after Plan, before Commit |
 
-Deckhand starts each step as its own subagent (researcher, planner or
-architect, test-writer, reviewer). Nothing is typed into your chat, and the
-agent you have in use stays as it is. Each subagent keeps its own limits, and
-the Runs tab shows it working. Build uses the agent you had in use if it can edit and run, otherwise the
-builder; Commit runs as plain Claude Code. Click a step's **agent** chip to pick
-another for this run. Start refuses a step whose agent lacks what it needs
-(with **Use plain Claude Code for this step**), and a step blocked by the
-limits, or that changed nothing when it should, stops with **Retry** and
-**Change agent**. If Claude Code refuses to start a step's subagent, the step
-says why and offers **Send through chat**. Each answer is saved to
+Each step goes into your chat as one prompt asking Claude to start that
+step's agent (researcher, planner or architect, test-writer, builder,
+reviewer, committer). The chat waits for that agent to finish, and Deckhand
+saves **the agent's own answer** as the step's result; the chat's reply is
+never used. Only then does the next step go in. The agent you have in use
+stays as it is. Each step's agent keeps its own limits, and the Runs tab shows
+it working. Build uses the agent you had in use if it can edit and run,
+otherwise the builder; Commit uses the committer. Click a step's **agent**
+chip to pick another for this run. Start refuses a step whose agent lacks what
+it needs (with **Use plain Claude Code for this step**), and a step blocked by
+the limits, that changed nothing when it should, or whose chat turn started no
+agent, stops with **Retry** and **Change agent**. Each answer is saved to
 `.deckhand/pipeline/<run>/` and the next step reads it. At a stop, click
 **Approve**, **Change** (type a note; the step runs again with it) or
 **Stop**.

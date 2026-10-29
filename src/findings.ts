@@ -119,34 +119,19 @@ export function reviewPrompt(head: string, diffFile: string, untracked: readonly
 Review the change in ${diffFile}.${extra}
 
 Start every reviewer below now, in one message: one Agent call each, with that
-subagent_type. Tell each to read the diff file and the code around it, change
-nothing, and report every finding as one JSON line exactly like:
+subagent_type, not in the background. Tell each to read the diff file and the
+code around it, change nothing, and report every finding as one JSON line
+exactly like:
 ${FINDING_FORMAT}
 severity is critical, high, medium or low; evidence is the exact code snippet;
-reviewer is its reviewer name. Do none of the reviewing yourself.
+reviewer is its reviewer name. Its whole final answer is only its finding
+lines, one per line, with nothing else; if it found nothing, exactly: ${NONE}
+Do none of the reviewing yourself.
 
 ${list}
 
-When they finish, your whole final answer is only their finding lines, one per
-line, copied as they gave them, with nothing else. If no reviewer found
-anything, answer exactly: ${NONE}
-`
-}
-
-// One reviewer's own prompt, when Deckhand spawns the reviewers itself.
-export function reviewerPrompt(head: string, diffFile: string, untracked: readonly string[], name: string): string {
-  const extra = untracked.length ? `\nNew files not in the diff (read them too): ${untracked.join(', ')}` : ''
-
-  return `${head}
-
-Review the change in ${diffFile}.${extra}
-
-Read the diff file and the code around it, change nothing, and report every
-finding as one JSON line exactly like:
-${FINDING_FORMAT}
-severity is critical, high, medium or low; evidence is the exact code snippet;
-reviewer is "${name}". Your whole final answer is only your finding lines, one
-per line, with nothing else. If you found nothing, answer exactly: ${NONE}
+When they have all finished, reply only: Done. Deckhand reads their answers
+itself.
 `
 }
 

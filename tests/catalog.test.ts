@@ -70,11 +70,27 @@ test('ECC agents keep the limit rules: reviewers and planners never edit, fixers
   }
   for (const id of ['planner', 'architect']) expect(limits(id).run).toBe(false)
   for (const id of ['bug-fixer', 'test-writer', 'refactorer']) expect(limits(id)).toEqual({ edit: true, run: true, internet: false })
-  expect(limits('docs-writer').internet).toBe(false)
+  expect(limits('docs-writer')).toEqual({ edit: true, run: true, internet: false })
+})
+
+test('ECC extras: the committer runs git but never edits; explorer reads, hunter reviews, simplifier edits', () => {
+  const limits = (id: string) => BUILTINS.find(b => b.id === id)!.agent.limits
+  expect(limits('committer')).toEqual({ edit: false, run: true, internet: false })
+  expect(BUILTINS.find(b => b.id === 'committer')!.agent.body).toMatch(/Never push/)
+  expect(limits('code-explorer')).toEqual({ edit: false, run: false, internet: false })
+  expect(limits('silent-failure-hunter')).toEqual({ edit: false, run: true, internet: false })
+  expect(limits('code-simplifier')).toEqual({ edit: true, run: true, internet: false })
+})
+
+test('the researcher is web only: its tool list names no file or shell tool', () => {
+  const r = BUILTINS.find(b => b.id === 'researcher')!
+  expect(r.agent.limits).toEqual({ edit: false, run: false, internet: true })
+  expect(r.agent.tools).toEqual(['WebSearch', 'WebFetch', 'mcp__deckhand__deck_progress'])
+  expect(parseAgent(agentText({ ...r.agent, name: 'researcher' })).agent.tools).toEqual(r.agent.tools)
 })
 
 test('ECC-adapted bodies stay under 150 lines and point at no ECC-only command or skill', () => {
-  for (const id of ['reviewer', 'planner', 'test-writer', 'security-auditor', 'refactorer', 'docs-writer', 'bug-fixer', 'architect', 'typescript-reviewer']) {
+  for (const id of ['reviewer', 'planner', 'test-writer', 'security-auditor', 'refactorer', 'docs-writer', 'bug-fixer', 'architect', 'typescript-reviewer', 'committer', 'code-explorer', 'silent-failure-hunter', 'code-simplifier']) {
     const body = BUILTINS.find(b => b.id === id)!.agent.body
     expect(body.split('\n').length).toBeLessThanOrEqual(150)
     expect(body).not.toMatch(/skill: |\/update-docs|\/update-codemaps|tdd-workflow|react-reviewer|Prompt Defense/)

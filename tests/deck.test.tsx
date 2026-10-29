@@ -15,6 +15,15 @@ test('the deck opens at session start', async ($, on) => {
   expect(w.opened).toEqual(['deck'])
 })
 
+test('the header shows the version the plugin manifest names', async ($, on) => {
+  world(on, { '.claude-plugin/plugin.json': '{ "name": "deckhand", "version": "9.8.7" }' })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+
+  expect(await ui.find({ type: 'Text', text: 'Deck v9.8.7' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('built-in agents show in a fresh project, and register hidden from the model', async ($, on) => {
   const w = world(on)
   await $.session.start(START)

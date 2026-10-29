@@ -46,6 +46,12 @@ export function limitsFor<T>(own: T | undefined, active: T | undefined): T | und
   return own ?? active
 }
 
+// Told to the agent in use, so it doesn't try tools the guard will deny.
+export function offText(limits: Limits): string | undefined {
+  const off = LIMITS.filter(l => !limits[l])
+  return off.length ? `Off for you (Deckhand blocks these tools): ${off.map(l => `${LIMIT_LABEL[l]} (${LIMIT_TOOLS[l].join(', ')})`).join('; ')}.` : undefined
+}
+
 export function badges(limits: Limits): string[] {
   const on = [
     limits.edit && 'edits files',

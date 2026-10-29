@@ -1,6 +1,6 @@
 # Pipeline steps run as subagents Deckhand spawns
 
-Date: 2026-10-29. Replaces 0007's "every step runs in the main chat with its
+Date: 2026-10-29. Spawning and Send through chat are replaced by 0013. Replaces 0007's "every step runs in the main chat with its
 agent active" and the parts of 0011 that swap the agent in use.
 
 ## What was asked
