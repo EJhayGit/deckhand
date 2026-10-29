@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.3 (unreleased)
+
+- **New built-in agent: builder.** It builds a feature from a plan, slice by
+  slice, keeping the checks green (adapted from ECC, credited in
+  `THIRD_PARTY_NOTICES.md`).
+- The Pipeline's Build step falls back to the builder when the agent in use
+  can't edit and run. Before, it fell back to bug-fixer, whose instructions
+  forbid adding features.
+- The Build step now says not to commit. Commit is its own step after Review
+  and your OK, and an early commit would leave Review an empty diff.
+
 ## 0.3.2 (unreleased)
 
 - **Pipeline steps are real subagents:** Deckhand starts each step's agent

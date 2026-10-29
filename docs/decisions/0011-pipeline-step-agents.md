@@ -24,7 +24,7 @@ step that got blocked.
   | Research | researcher | internet |
   | Plan | planner (architect for Big) | read only |
   | Tests | test-writer | edit, run |
-  | Build | agent in use if it can edit and run, else fixer, else bug-fixer, else plain Claude Code | edit, run |
+  | Build | agent in use if it can edit and run, else builder, else plain Claude Code | edit, run |
   | Review | reviewer (+ security-auditor on the existing triggers) | read only |
   | Commit | plain Claude Code | edit, run |
 
@@ -47,8 +47,10 @@ step that got blocked.
 
 ## Limits of this build
 
-- "Fixer" is the deck's `fixer` if there is one, else the built-in
-  `bug-fixer` (there is no built-in called `fixer`).
+- Build's fallback is the built-in `builder` (added 2026-10-29, from the
+  owner's file, adapted from ECC's gan-generator and build-error-resolver).
+  It replaced `fixer` / `bug-fixer`: bug-fixer's instructions forbid adding
+  features, so it isn't a builder.
 - Commit isn't checked for "changed nothing": a commit empties the diff, so
   git can't tell.
 - A step that only touches gitignored files counts as changing nothing.

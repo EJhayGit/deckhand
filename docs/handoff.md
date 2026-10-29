@@ -2,16 +2,13 @@
 
 ## State
 
-- 0.3.0 (PR #12) and 0.3.1 (PR #13, tag `v0.3.1`, GitHub release) are merged.
-  The marketplace install is 0.3.1.
-- **0.3.2 is on branch `claude/pipeline-subagents`, one PR, not merged:**
-  Pipeline steps run as subagents Deckhand spawns itself (decision 0012).
-  `startStep` / `spawnAll` in `src/pipelineRun.ts` call `$.agent.spawn`, and
-  `onPipelineAgentEnd` (wired in `hooks/register.tsx`) takes each subagent's
-  `turn.complete` answer. Review spawns each reviewer (`reviewerPrompt`) and
-  the skeptic. The agent in use is never changed. The `tool.call` guard gives
-  a subagent its own limits (`loopAgent` in `src/session.ts`). A refused
-  spawn blocks the step with **Send through chat** (`chatPipeline`).
+- 0.3.2 is merged (PR #14), tagged `v0.3.2` with a GitHub release, and is
+  the marketplace install.
+- **0.3.3 is on branch `claude/builder-agent`, one PR, not merged:** a new
+  built-in `builder` agent (`src/agents/starters.ts`, from the owner's
+  `builder.md`, adapted from ECC and credited in `THIRD_PARTY_NOTICES.md`).
+  Build's fallback in `agentFor` (`src/pipeline.ts`) is now the builder
+  instead of fixer / bug-fixer.
 - Checks pass: `claude plugin validate .` (the usual no-icon warning), `tsc`
   with the bundled types, `claude plugin test .` (137 tests).
 - The test world (`tests/world.ts`) now maps paths correctly inside a git
@@ -32,7 +29,7 @@ Owner, from the dev-mod copy, with the marketplace deckhand turned off (it's
 1. Deck: **Use** researcher. Swarm tab: type a small task, pick **Small**,
    click **Start**.
 2. Nothing is typed into the chat. The Runs tab shows `Pipeline 1/4 · Tests`
-   (test-writer) working, then Build (bug-fixer). The Deck still says
+   (test-writer) working, then Build (builder). The Deck still says
    researcher.
 3. If a step shows "Claude Code didn't start …", auto mode refused the spawn:
    click **Send through chat** and tell me, because that changes the design.

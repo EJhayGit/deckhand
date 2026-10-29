@@ -5,8 +5,8 @@
 Several built-in agents in `src/agents/starters.ts` are adapted from the
 `agents/` folder of [affaan-m/ECC](https://github.com/affaan-m/ECC) at commit
 `25278e7`: code-reviewer, planner, tdd-guide, security-reviewer,
-refactor-cleaner, doc-updater, build-error-resolver, architect and
-typescript-reviewer. Each one is marked with an `origin:` comment.
+refactor-cleaner, doc-updater, build-error-resolver, architect,
+typescript-reviewer and builder (from gan-generator and build-error-resolver). Each one is marked with an `origin:` comment.
 
 ```
 MIT License
