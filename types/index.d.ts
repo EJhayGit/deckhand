@@ -61,13 +61,16 @@ export type PipeKind = 'feature' | 'fix' | 'change' | 'cleanup'
 export type PipeSize = 'tiny' | 'small' | 'normal' | 'big'
 export type PipeStepId = 'research' | 'plan' | 'tests' | 'build' | 'review' | 'commit'
 // gate: done, waiting for the owner's OK before the run goes on. blocked: a
-// limit stopped it, or it changed nothing it was meant to. `note`: why the
-// step runs as plain Claude Code.
-export type PipeStep = { id: PipeStepId; agent: string | null; status: 'waiting' | 'running' | 'done' | 'gate' | 'failed' | 'blocked'; summary?: string; error?: string; note?: string }
+// limit stopped it, it changed nothing it was meant to, or Claude Code refused
+// to start its subagent (`refused`). `note`: why the step runs as plain Claude
+// Code.
+export type PipeStep = { id: PipeStepId; agent: string | null; status: 'waiting' | 'running' | 'done' | 'gate' | 'failed' | 'blocked'; summary?: string; error?: string; note?: string; refused?: boolean }
 // A step whose agent lacks a permission it needs, found at Start.
-export type PipeShortfall = { step: PipeStepId; agent: string; missing: (keyof Limits)[] }
-// One pipeline: `owner` is the agent in use when it started, put back at the
-// end; `prompt` is the step prompt in flight, matched at its turn's end.
+export type PipeShortfall = { step: PipeStepId; agent: string; missing: (keyof Limits)[]; reason?: string }
+// One pipeline. Each step runs as subagents Deckhand spawns: `agentIds` are
+// the ones in flight, `answers` what each ended with. `prompt` is a step sent
+// through the chat instead (Send through chat), matched at its turn's end.
+// `owner` is the agent in use at Start; the run never changes it.
 export type PipeRun = {
   id: string
   task: string
@@ -88,6 +91,9 @@ export type PipeRun = {
   // before a step that must edit.
   blocked?: string
   before?: string
+  agentIds?: string[]
+  spawning?: boolean
+  answers?: Record<string, { reason: string; answer: string }>
 }
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'

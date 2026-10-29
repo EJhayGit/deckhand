@@ -21,6 +21,8 @@ export type World = {
   reply: { ok: boolean; status: number; text: string } | 'refused'
   enabledPlugins: Record<string, boolean>
   spawned: { subagentType: string; description: string; prompt: string }[]
+  // Set: agent.spawn refuses with this reason.
+  spawnDeny?: string
   commands: { name: string; description: string; source: 'builtin' | 'plugin' | 'user' | 'mcp'; plugin?: string }[]
 }
 
@@ -92,9 +94,16 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
     return { value: { isPlaced: true } }
   })
   on('settings.read', () => ({ value: { enabledPlugins: w.enabledPlugins } }))
+  // The model's Agent call, or (in the test engine) a plugin's own
+  // $.agent.spawn, which arrives shaped like the Agent tool's input and reads
+  // the id back from `result`.
   on('agent.spawn', (_, e) => {
-    w.spawned.push({ subagentType: e.subagentType, description: e.description, prompt: e.prompt })
-    return { model: 'claude-sonnet-5-5', agentId: `a${w.spawned.length}` }
+    if (w.spawnDeny) return { deny: w.spawnDeny }
+    const call = e as typeof e & { subagent_type?: string }
+    const subagentType = call.subagentType ?? call.subagent_type ?? ''
+    w.spawned.push({ subagentType, description: e.description, prompt: e.prompt })
+    const agentId = `a${w.spawned.length}`
+    return { model: 'claude-sonnet-5-5', agentId, ...('subagent_type' in call ? { result: { agentId, agentType: subagentType } } : {}) } as never
   })
   on('command.list', () => ({ value: w.commands }))
   on('command.run', (_, e) => {

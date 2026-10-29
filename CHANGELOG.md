@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2 (unreleased)
+
+- **Pipeline steps are real subagents:** Deckhand starts each step's agent
+  itself and saves its answer as the step's result. Nothing is typed into
+  your chat, and the agent in use is never changed. Review's reviewers and
+  the skeptic are started the same way.
+- **Subagents keep their own limits:** a test-writer can edit even while a
+  read-only agent is in use in your chat. The chat and other subagents still
+  get the agent in use's limits.
+- If Claude Code refuses to start a step's subagent, the step says why and
+  offers **Send through chat**.
+- Start refuses a step whose agent runs on a Local or Codex model, because
+  those can't be subagents.
+
 ## 0.3.1 (unreleased)
 
 - **Pipeline step agents:** each step runs with an agent suited to it

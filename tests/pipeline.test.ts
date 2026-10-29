@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { after, agentAfter, agentFor, autoText, blockedIn, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, preflight, runId, shortfallText, stepPrompt, stepsFor, withAgent } from '../src/pipeline'
+import { limitsFor } from '../src/limits'
+import { after, agentFor, autoText, blockedIn, chatPrompt, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, preflight, runId, shortfallText, stepPrompt, stepsFor, typeOf, withAgent } from '../src/pipeline'
 import type { PipeRun } from '../types'
 
 test('every size runs the steps in the plan\'s table, for every kind', () => {
@@ -59,12 +60,31 @@ test('preflight: a read-only Tests agent stops Start; plain Claude Code and fit 
   expect(preflight(withAgent(run, 'tests', null).steps, DECK)).toEqual([])
 })
 
-test('the agent in use at Start is put back when the run ends or stops', () => {
-  const run = newPipeline('x', 't', 'feature', 'normal', 'researcher', DECK)
-  const stopped = after(run, { kind: 'stop' }).run
-  expect(agentAfter(stopped, DECK)).toBe('researcher')
-  expect(agentAfter({ owner: null }, DECK)).toBeNull()
-  expect(agentAfter({ owner: 'gone' }, DECK)).toBeNull()
+test('each step spawns its deck agent\'s type; plain Claude Code is general-purpose', () => {
+  const cards = [{ name: 'test-writer', agentType: 'deckhand:test-writer' }, { name: 'mine', agentType: 'mine' }]
+  expect(typeOf('test-writer', cards)).toBe('deckhand:test-writer')
+  expect(typeOf('mine', cards)).toBe('mine')
+  expect(typeOf('planner', cards)).toBe('deckhand:planner')
+  expect(typeOf(null, cards)).toBe('general-purpose')
+  const sent = chatPrompt('deckhand:test-writer', 'Write the tests.')
+  expect(sent).toContain('subagent_type `deckhand:test-writer`')
+  expect(sent).toContain('Do none of the work yourself.')
+  expect(sent.endsWith('Write the tests.')).toBe(true)
+})
+
+test('preflight: an agent on a Local or Codex model can\'t run as a subagent', () => {
+  const run = newPipeline('x', 't', 'feature', 'small', null, { ...DECK, local: BUILD }, { build: 'local' })
+  const short = preflight(run.steps, { ...DECK, local: BUILD }, ['local'])
+  expect(short).toEqual([{ step: 'build', agent: 'local', missing: [], reason: 'runs on a Local or Codex model and can\'t run as a subagent.' }])
+  expect(shortfallText(short[0]!)).toBe('Build: local runs on a Local or Codex model and can\'t run as a subagent.')
+})
+
+test('a loop keeps its own limits, else the agent in use\'s', () => {
+  const own = { name: 'test-writer', limits: BUILD }
+  const active = { name: 'researcher', limits: READ }
+  expect(limitsFor(own, active)).toBe(own)
+  expect(limitsFor(undefined, active)).toBe(active)
+  expect(limitsFor(undefined, undefined)).toBeUndefined()
 })
 
 test('blocked: a needed permission stops the step until Retry; a stray edit in a read-only step does not', () => {

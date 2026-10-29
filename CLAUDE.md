@@ -48,9 +48,13 @@ starter templates; `PLAN.md` wins over them. Design choices go in
 - Pure modules (tested without the engine): `src/agents/format.ts`,
   `src/limits.ts`, `src/repeat.ts`, `src/models.ts`, `src/gateway.ts`,
   `src/ui/status.ts`, `src/skills.ts`, `src/pipeline.ts`, `src/findings.ts`.
-- The Pipeline (`src/pipelineRun.ts`) runs each step in the main chat with
-  the step's agent active, and saves `turn.complete`'s answer as the step's
-  result file (`docs/decisions/0007-pipeline.md`).
+- The Pipeline (`src/pipelineRun.ts`) spawns each step's agent itself with
+  `$.agent.spawn` and saves that subagent's `turn.complete` answer as the
+  step's result file. It never changes the agent in use
+  (`docs/decisions/0012-pipeline-subagents.md`).
+- The `tool.call` guard gives a subagent its own limits (`loopAgent` in
+  `src/session.ts`): a Pipeline step's agent, or a deck agent by its Runs
+  row. Every other loop gets the agent in use's limits.
 - An active agent applies through hooks: `prompt.compose` adds its
   instructions, `turn.step` rewrites model and effort for the main loop only
   (`e.agentId === undefined`) or answers Local/Codex turns itself, and

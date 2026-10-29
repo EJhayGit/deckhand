@@ -5,7 +5,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { DeckAgent, PipeRun, PipeStep, PipeStepId, Pipeline, SwarmDraft, SwarmMode } from '../../types'
 import { KINDS, SIZES, STEP_LABEL, autoText, fileOf, gatesText, guessKind, guessSize, newPipeline, shortfallText } from '../pipeline'
-import { approvePipeline, changePipeline, clearPipeline, fixFirstPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline } from '../pipelineRun'
+import { approvePipeline, changePipeline, chatPipeline, clearPipeline, fixFirstPipeline, pickAgent, pickStep, retryPipeline, startPipeline, stopPipeline } from '../pipelineRun'
 import { PRESETS, startSwarm } from '../swarm'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
@@ -152,7 +152,7 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
         <Box key={`step-${i}`} flexDirection="column" borderStyle="round" borderColor={step.status === 'gate' ? 'warning' : undefined} paddingX={1}>
           <Box flexDirection="row" gap={1}>
             <Text>{STEP_ICON[step.id]} {i + 1}. {STEP_LABEL[step.id]}</Text>
-            <Text dimColor>{step.agent ?? 'plain Claude Code'}</Text>
+            <Text dimColor>{step.status === 'running' && run.prompt === null ? `subagent: ${run.phase === 'skeptic' ? 'skeptic' : step.id === 'review' ? 'reviewers' : (step.agent ?? 'plain Claude Code')}` : (step.agent ?? 'plain Claude Code')}</Text>
             <Text color={STATUS_COLOR[step.status]}>{STATUS[step.status]}</Text>
             {!run.ended && (step.status === 'waiting' || step.status === 'blocked') && <Button key={`agent-${step.id}`} label="agent" variant="secondary" dimColor onPress={() => pickStep($, step.id)} />}
           </Box>
@@ -178,6 +178,7 @@ function renderRun($: EngineInterface, e: RenderInput, run: PipeRun, note: strin
       {blocked && !run.ended && (
         <Box flexDirection="row" gap={1}>
           <Button key="pipeline-retry" label="Retry" variant="primary" onPress={() => retryPipeline($)} />
+          {blocked.refused && <Button key="pipeline-chat" label="Send through chat" onPress={() => chatPipeline($)} />}
           <Button key="pipeline-change-agent" label="Change agent" onPress={() => pickStep($, blocked.id)} />
           <Button key="pipeline-stop" label="Stop" onPress={() => stopPipeline($)} />
         </Box>

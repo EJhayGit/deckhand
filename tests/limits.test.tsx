@@ -1,5 +1,5 @@
 // MUST PASS: a limit that leaks is the worst bug this mod can have.
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { PANE, START, agentFile, world } from './world'
@@ -139,4 +139,25 @@ test('the guard fails closed: when it cannot read the active agent, the call is 
 
   expect(ran).toEqual([])
   expect(JSON.stringify(result)).toContain('limit check failed')
+})
+
+test('a deck subagent keeps its own limits; any other subagent gets the agent in use\'s', async ($, on) => {
+  world(on, { '.claude/agents/reviewer.md': agentFile('reviewer'), '.claude/agents/fixer.md': agentFile('fixer', '{ edit: true, run: true, internet: false }') })
+  mock.clock(on)
+  const ran: string[] = []
+  on('tool.call', (_, e) => {
+    ran.push(e.tool)
+    return { result: {} }
+  })
+  await $.session.start(START)
+  await useAgent($, 'reviewer')
+  const edit = { tool: 'Edit', file_path: 'src/a.ts', old_string: 'a', new_string: 'b' }
+
+  const fixer = await $.agent.spawn({ subagentType: 'fixer', prompt: 'Fix it.', description: 'fix' } as never)
+  const general = await $.agent.spawn({ subagentType: 'general-purpose', prompt: 'Fix it.', description: 'fix' } as never)
+  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (fixer as { agentId: string }).agentId } as never))).not.toContain('Blocked')
+  expect(ran).toEqual(['Edit'])
+  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (general as { agentId: string }).agentId } as never))).toContain('Blocked: reviewer')
+  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: 'unknown' } as never))).toContain('Blocked: reviewer')
+  expect(ran).toEqual(['Edit'])
 })
