@@ -438,7 +438,7 @@ Pipeline becomes the Swarm tab's main mode. It runs a task through ordered steps
 
 *(Diagram in the original: Normal pipeline · 5 steps, 2 stops for your OK.)*
 
-Change sends the plan back with your note. Fix these first sends confirmed review findings back to Build before you commit.
+Change sends the plan back with your note. At Review, Fix these sends the ticked findings back to Build, then re-reviews, in rounds (section 16).
 
 **Kind and size.** The owner types the task, then picks a kind and a size. Deckhand suggests both and the owner can change them.
 
@@ -457,7 +457,7 @@ Change sends the plan back with your note. Fix these first sends confirmed revie
 - Research: `researcher` (web only: its tools are web search and fetch).
 - Plan: `planner`, or `architect` for Big. Output is a numbered task list of thin slices.
 - Tests: `test-writer` (now ECC's tdd-guide).
-- Build: the agent in use if it can edit and run, else the built-in `builder`, else plain Claude Code. `bug-fixer` is not used: its instructions forbid adding features.
+- Build: the built-in `builder` (`bug-fixer` for a Fix), else plain Claude Code. Never the agent in use (`docs/decisions/0015-review-fix-loop.md`).
 - Review: `reviewer`, plus `security-auditor` on security triggers (Milestone 4).
 - Commit: the built-in `committer` (from ECC commit-reviewer), one commit per logical chunk, never pushes.
 - Each step goes into the chat as one prompt that starts the step's agent in the foreground. That agent's own answer is the step's result, the step waits for it, and the agent in use isn't changed (`docs/decisions/0013-pipeline-through-chat.md`, replacing 0012's direct spawn).
@@ -542,3 +542,22 @@ decision 0014 (`docs/decisions/0014-card-deck.md`):
 
 Still to check live: card width, hover borders and emoji alignment in the
 terminal and the desktop app.
+
+## 16. 0.6.0: the Review fix loop (2026-10-29)
+
+Change at a paused Review used to rerun only the reviewers. Now findings go
+back to Build and get re-reviewed (`docs/decisions/0015-review-fix-loop.md`):
+
+- The Review gate lists the merged findings with checkboxes (medium and up
+  ticked, low and refuted not). Buttons: Fix these, Approve, Stop.
+- Fix these writes the ticked findings and the note to
+  `.deckhand/pipeline/<run>/<nn>-fixes.md`, runs Build told to fix only
+  those, then reviews that round's diff only. One round.
+- Rounds repeat by themselves until clean. Brakes: Max rounds chip (1 to 5,
+  default 3), no progress (same findings by file plus code, or no fewer),
+  rising (more new than fixed). A brake returns to the gate with the reason.
+- Each step runs on its own agent, never the agent in use. Build is the
+  builder, or bug-fixer for a Fix. A step agent that can't do the step fails
+  it with a message.
+- Runs tags each round's agents `Round 2/3 · Build`; step cards show each
+  round's tokens and cost.

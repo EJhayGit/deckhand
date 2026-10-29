@@ -2,8 +2,23 @@
 
 ## State
 
-- **0.5.0 is on branch `claude/deck-da3e4a`, PR #17, not merged**
-  (`docs/decisions/0014-card-deck.md`, PLAN §15). The deck as cards:
+- **0.6.0 is released** (PR #18 merged, tag `v0.6.0`)
+  (`docs/decisions/0015-review-fix-loop.md`, PLAN §16). The Review fix loop:
+  - The Review gate lists findings with ☑/☐ (medium and up ticked). Fix
+    these / Approve / Stop; Change at Review means Fix these.
+  - A round: ticked findings + note to `<nn>-fixes.md`, Build fixes only
+    those, Review reads that round's diff (`git stash create` snapshot).
+    Rounds repeat until clean; brakes: Max rounds chip (default 3), no
+    progress, rising. Pure logic is `progress` etc. in `src/findings.ts`.
+  - Build never uses the agent in use: builder, or bug-fixer for a Fix. A
+    step agent that can't do its step fails it with a message.
+  - Runs tags rounds `Round 2/3 · Build`; step cards show per-round cost.
+  - Checks: validate passes, tsc clean (bundled types), 159 tests pass.
+  - Not yet live-tested. To check live: `git stash create` on Windows, the
+    ☑/☐ buttons in terminal and desktop, and that auto mode accepts the
+    reworded step prompts.
+- 0.5.0 (PR #17, the deck as cards) is merged
+  (`docs/decisions/0014-card-deck.md`, PLAN §15):
   - Agents are 24-column cards in a wrapping grid (icon, name, status from
     `cardStatus` in `src/ui/status.ts`, model, short limit badges). "⋯"
     opens a detail panel with **Put on step** (calls `pickAgent`).
@@ -51,10 +66,12 @@
 Owner, from the dev-mod copy, with the marketplace deckhand turned off (it's
 0.3.1, and two copies fight):
 
-Open the Deck from the dev-mod copy and check the cards in the terminal and
-the desktop app: card width, hover borders, emoji icons lining up with the
-borders, Put on step, and a Pipeline run moving across the step cards. Then
-merge PR #17 and tag `v0.5.0` (tag `v0.4.0` too if it isn't yet).
+Run a Tiny Pipeline in the sandbox repo that leaves a medium finding, then
+at the Review stop tick/untick findings, press **Fix these**, and watch the
+round go Build → Review with `Round 1/3 · …` rows in Runs. Run only one
+Deckhand copy: on 2026-10-29 the marketplace copy and a dev-mod copy ran
+together and a command was blocked as docs-writer with the Deck showing None.
+If that happens with one copy, run `/deck limits` right then.
 
 Left-over low review items on PR #17 (not fixed, by the owner's choice):
 Put on step after an ended run isn't visible until Clear; dead skill cards

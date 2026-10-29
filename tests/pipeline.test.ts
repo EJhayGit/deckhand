@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { limitsFor } from '../src/limits'
-import { after, agentFor, autoText, blockedIn, chatPrompt, fileOf, gatesText, guessKind, guessSize, newPipeline, planBump, preflight, runId, shortfallText, stepPrompt, stepsFor, typeOf, withAgent } from '../src/pipeline'
+import { after, agentFor, autoText, blockedIn, chatPrompt, fileOf, fixesOf, gatesText, guessKind, guessSize, newPipeline, planBump, preflight, roundTotals, runId, shortfallText, stepPrompt, stepsFor, typeOf, withAgent } from '../src/pipeline'
 import type { PipeRun } from '../types'
 
 test('every size runs the steps in the plan\'s table, for every kind', () => {
@@ -20,22 +20,22 @@ const READ = { edit: false, run: false, internet: false }
 const BUILD = { edit: true, run: true, internet: false }
 const DECK = { researcher: { ...READ, internet: true }, planner: READ, architect: READ, 'test-writer': BUILD, reviewer: READ, fixer: BUILD, 'bug-fixer': BUILD, builder: BUILD, committer: { ...READ, run: true } }
 
-test('each step has its default agent: architect plans Big, the agent in use builds, the committer commits', () => {
+test('each step has its default agent: architect plans Big, the builder builds, the committer commits', () => {
   const agents = (size: 'normal' | 'big') => newPipeline('x', 't', 'feature', size, 'fixer', DECK).steps.map(s => s.agent)
-  expect(agents('normal')).toEqual(['planner', 'test-writer', 'fixer', 'reviewer', 'committer'])
-  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'fixer', 'reviewer', 'committer'])
+  expect(agents('normal')).toEqual(['planner', 'test-writer', 'builder', 'reviewer', 'committer'])
+  expect(agents('big')).toEqual(['researcher', 'architect', 'test-writer', 'builder', 'reviewer', 'committer'])
   expect(newPipeline('x', 't', 'feature', 'tiny', null).steps[0]!.agent).toBeNull()
-  expect(agentFor('commit', 'small', null, { builder: BUILD })).toEqual({ agent: null, note: 'No committer agent installed: plain Claude Code commits.' })
+  expect(agentFor('commit', 'small', 'feature', { builder: BUILD })).toEqual({ agent: null, note: 'No committer agent installed: plain Claude Code commits.' })
 })
 
-test('Build: the agent in use if it can edit and run, else the builder, else plain Claude Code', () => {
-  const tester = { ...DECK, mine: BUILD }
-  expect(agentFor('build', 'small', 'mine', tester)).toEqual({ agent: 'mine' })
-  expect(agentFor('build', 'small', 'researcher', DECK)).toEqual({ agent: 'builder' })
-  expect(agentFor('build', 'small', null, DECK)).toEqual({ agent: 'builder' })
-  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher, fixer: BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
-  // A bug fixer is not a builder: its instructions say no features.
-  expect(agentFor('build', 'small', 'researcher', { researcher: DECK.researcher, 'bug-fixer': BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
+test('Build never takes the agent in use: the builder, the bug-fixer for a Fix, else plain Claude Code', () => {
+  expect(newPipeline('x', 't', 'feature', 'small', 'fixer', DECK).steps[1]!.agent).toBe('builder')
+  expect(agentFor('build', 'small', 'feature', DECK)).toEqual({ agent: 'builder' })
+  expect(agentFor('build', 'small', 'fix', DECK)).toEqual({ agent: 'bug-fixer' })
+  expect(agentFor('build', 'small', 'fix', { builder: BUILD })).toEqual({ agent: 'builder' })
+  expect(agentFor('build', 'small', 'feature', { researcher: DECK.researcher, fixer: BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
+  // A bug fixer is not a builder outside a Fix: its instructions say no features.
+  expect(agentFor('build', 'small', 'feature', { researcher: DECK.researcher, 'bug-fixer': BUILD })).toEqual({ agent: null, note: 'No builder agent installed: plain Claude Code builds.' })
 })
 
 test('a missing default agent falls back to plain Claude Code and says so', () => {
@@ -70,7 +70,7 @@ test('each step spawns its deck agent\'s type; plain Claude Code is general-purp
   const sent = chatPrompt('deckhand:test-writer', 'Write the tests.')
   expect(sent).toContain('subagent_type `deckhand:test-writer`')
   expect(sent).toMatch(/not in\s+the background/)
-  expect(sent).toContain('reply only: Done.')
+  expect(sent).toMatch(/reply\s+only: Done\./)
   expect(sent.endsWith('Write the tests.')).toBe(true)
 })
 
@@ -196,4 +196,30 @@ test('later steps name the earlier result files', () => {
   expect(fileOf(run, 0)).toBe('.deckhand/pipeline/20261029-101112/01-plan.md')
   expect(stepPrompt(run, 2)).toContain('- .deckhand/pipeline/20261029-101112/02-tests.md')
   expect(runId(Date.UTC(2026, 9, 29, 10, 11, 12))).toBe('20261029-101112')
+})
+
+test('a fix event at the Review gate sends Build back as the next round; anywhere else it does nothing', () => {
+  const run = newPipeline('20261029-100000', 't', 'feature', 'small', null, DECK)
+  const gate = { ...run, cap: 3, steps: run.steps.map((s, i) => (i < 2 ? { ...s, status: 'done' as const } : i === 2 ? { ...s, status: 'gate' as const } : s)) }
+  const prev = [{ id: 1, severity: 'medium' as const, file: 'a', line: 1, title: 't', evidence: 'e', reviewers: ['r'], verdict: 'advice' as const }]
+  const fixed = after({ ...gate, brake: 'old' }, { kind: 'fix', previous: prev, base: 'abc' })
+  expect(fixed.next).toBe(1)
+  expect(fixed.run.steps.map(s => s.status)).toEqual(['done', 'waiting', 'waiting', 'waiting'])
+  expect(fixed.run).toMatchObject({ round: 1, previous: prev, base: 'abc', brake: undefined })
+  expect(after(fixed.run, { kind: 'fix', previous: [] }).next).toBeNull()
+  expect(stepPrompt(fixed.run, 1)).toContain('Fix round 1/3. Read .deckhand/pipeline/20261029-100000/02-fixes.md')
+  expect(fixesOf(run)).toBe('.deckhand/pipeline/20261029-100000/02-fixes.md')
+})
+
+test('round totals add up each round\'s Runs rows for one step, from this run only', () => {
+  const since = Date.UTC(2026, 9, 29, 10, 0, 0)
+  const rows = [
+    { title: 'Round 1/3 · Build', tokens: 100, cost: 0.1, startedAt: since + 5 },
+    { title: 'Round 1/3 · Review (reviewer)', tokens: 50, cost: 0.05, startedAt: since + 6 },
+    { title: 'Round 2/3 · Build', tokens: 30, cost: 0.03, startedAt: since + 7 },
+    { title: 'Round 2/3 · Build', tokens: 999, cost: 9, startedAt: since - 1000 },
+  ]
+  expect(roundTotals(rows, { id: '20261029-100000', round: 2 }, 'build')).toEqual([{ round: 1, tokens: 100, cost: 0.1 }, { round: 2, tokens: 30, cost: 0.03 }])
+  expect(roundTotals(rows, { id: '20261029-100000', round: 2 }, 'review')).toEqual([{ round: 1, tokens: 50, cost: 0.05 }, { round: 2, tokens: 0, cost: 0 }])
+  expect(roundTotals(rows, { id: '20261029-100000' }, 'build')).toEqual([])
 })

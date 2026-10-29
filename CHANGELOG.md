@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
+- **Review has a fix loop.** At the Review stop, findings have checkboxes
+  (medium and up ticked). **Fix these** sends the ticked ones and your note
+  to Build, then reviews just that change, round after round until clean.
+  It stops early, with the reason, at the **Max rounds** cap (1 to 5,
+  default 3), when a round makes no progress, or when findings rise.
+  **Fix these first** and Change at Review are gone; Change there now means
+  Fix these.
+- **Each step runs on its own agent.** Build no longer uses the agent you
+  have in use: it's the builder, or the bug-fixer for a Fix. A step agent
+  that can't edit or run when it must fails the step with a note.
+- Runs tags fix rounds `Round 2/3 · Build`; step cards show each round's
+  tokens and cost. Step prompts name the agent first so auto mode allows
+  the start.
+
 ## 0.5.0 (unreleased)
 
 - **The Deck looks like a deck.** Each agent is a card in a grid with its
