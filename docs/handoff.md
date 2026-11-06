@@ -2,7 +2,7 @@
 
 ## State
 
-- **0.7.0 (branch `claude/reload-plugins-ab118d`, not merged):** issue #19
+- **0.7.0 is released** (PR #21 merged, tag `v0.7.0`): issue #19
   plus the 2026-11-06 audit (PLAN §17, decision 0016):
   - #19: `filesState` in `src/pipelineRun.ts` adds each untracked file
     (`git ls-files --others --exclude-standard -z`) and its content hash
@@ -22,7 +22,7 @@
     between turns, `$.state` keeps the run, and the next `turn.start` sets
     the hook's prompt again.
   - Checks: validate passes, tsc clean (`npx -p typescript`, main
-    checkout's types), 165 tests pass. Not yet live-tested.
+    checkout's types), 165 tests pass. Live (2026-11-06, Haiku): #19 git commands work on Windows; a test-writer started under reviewer was blocked on Write and Bash ("started by reviewer"); with nothing in use subagents ran free. Pipeline and Repeat changes not live-tested.
 - **0.6.0 is released** (PR #18 merged, tag `v0.6.0`)
   (`docs/decisions/0015-review-fix-loop.md`, PLAN §16). The Review fix loop:
   - The Review gate lists findings with ☑/☐ (medium and up ticked). Fix
