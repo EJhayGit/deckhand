@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1 (unreleased)
+
+- **Fix (#19):** a Build or Tests step that only edited a file git doesn't
+  track yet was blocked as "changed no files". Untracked files now count by
+  their content.
+- **Fix:** Review saw a new folder as one name (`src/auth/`), so it could
+  skip the TypeScript reviewer and listed the folder, not its files. It now
+  lists each new file.
+
 ## 0.6.0 (unreleased)
 
 - **Review has a fix loop.** At the Review stop, findings have checkboxes

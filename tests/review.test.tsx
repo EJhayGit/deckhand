@@ -114,6 +114,19 @@ test('the chat starts the reviewers side by side, duplicates merge, the skeptic 
   await ui.unmount()
 })
 
+test('Review sees each file inside a new folder, not just the folder', async ($, on) => {
+  const w = world(on)
+  w.outputs = {
+    'git status --porcelain': '?? src/auth/\n',
+    'git ls-files --others --exclude-standard -z': 'src/auth/login.ts\0src/auth/my token.ts\0',
+  }
+  const clock = mock.clock(on)
+  await toReview($, w, clock)
+
+  expect(w.spawned.map(s => s.subagentType)).toContain('deckhand:typescript-reviewer')
+  expect(w.spawned[1]!.prompt).toContain('read them too): src/auth/login.ts, src/auth/my token.ts')
+})
+
 test('a review line that won\'t parse fails the step and says why', async ($, on) => {
   const w = world(on)
   w.outputs = { 'git status --porcelain': ' M README.md\n', 'git diff HEAD': '+Some words\n' }

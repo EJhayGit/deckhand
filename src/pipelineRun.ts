@@ -286,12 +286,12 @@ async function failAt($: EngineInterface, run: PipeRun, index: number, error: st
 async function reviewInputs($: EngineInterface, run: PipeRun, index: number): Promise<{ diffFile: string; untracked: string[]; names: string[] } | string> {
   const status = await git($, ['git', 'status', '--porcelain'])
   const diff = await git($, ['git', 'diff', run.round ? (run.base ?? 'HEAD') : 'HEAD'])
-  if (status === undefined || diff === undefined) return 'Couldn\'t read the diff with git.'
-  const files = changedFiles(status)
+  const untracked = await untrackedFiles($)
+  if (status === undefined || diff === undefined || untracked === undefined) return 'Couldn\'t read the diff with git.'
+  const files = [...changedFiles(status.split(/\r?\n/).filter(l => !l.startsWith('??')).join('\n')), ...untracked]
   if (files.length === 0 && diff.trim() === '') return 'The diff is empty: nothing to review.'
   const diffFile = diffOf(run, index)
   await $.fs.write(diffFile, diff)
-  const untracked = status.split(/\r?\n/).filter(l => l.startsWith('??')).map(l => l.slice(3))
 
   return { diffFile, untracked, names: reviewersFor(files, diff) }
 }
@@ -340,6 +340,11 @@ async function git($: EngineInterface, argv: string[]): Promise<string | undefin
   return ran?.exitCode === 0 ? ran.stdout : undefined
 }
 
+async function gitIn($: EngineInterface, argv: string[], stdin: string): Promise<string | undefined> {
+  const ran = await $.process.run(argv, { stdin }).catch(() => undefined)
+  return ran?.exitCode === 0 ? ran.stdout : undefined
+}
+
 // Agents on Local or Codex models: they answer only the main chat.
 function localOf(cards: readonly DeckAgent[]): string[] {
   return cards.filter(c => routeOf(c.agent.model).kind === 'local' || routeOf(c.agent.model).kind === 'codex').map(c => c.agent.name)
@@ -353,11 +358,21 @@ function diffOf(run: PipeRun, index: number): string {
   return fileOf(run, index).replace(/\.md$/, '.diff')
 }
 
-// The working tree's state, to tell whether a step changed anything.
+// Each untracked file by name, inside new folders too (status shows only `?? dir/`).
+async function untrackedFiles($: EngineInterface): Promise<string[] | undefined> {
+  const out = await git($, ['git', 'ls-files', '--others', '--exclude-standard', '-z'])
+  return out?.split('\0').filter(f => f !== '')
+}
+
+// The working tree's state, to tell whether a step changed anything. Untracked
+// files count by content: neither status nor diff shows an edit to one.
 async function filesState($: EngineInterface): Promise<string | undefined> {
   const status = await git($, ['git', 'status', '--porcelain'])
   const diff = await git($, ['git', 'diff', 'HEAD'])
-  return status === undefined || diff === undefined ? undefined : `${status}\n${diff}`
+  const untracked = await untrackedFiles($)
+  if (status === undefined || diff === undefined || untracked === undefined) return undefined
+  const hashes = untracked.length ? await gitIn($, ['git', 'hash-object', '--stdin-paths'], untracked.join('\n')) : ''
+  return hashes === undefined ? undefined : `${status}\n${diff}\n${untracked.join('\n')}\n${hashes}`
 }
 
 // shortcut: a step that only changes ignored files counts as changing nothing.

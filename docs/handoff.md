@@ -2,6 +2,14 @@
 
 ## State
 
+- **0.6.1 (branch `claude/reload-plugins-ab118d`, not merged):** fixes
+  issue #19. `filesState` in `src/pipelineRun.ts` now adds each untracked
+  file (`git ls-files --others --exclude-standard -z`) and its content hash
+  (`git hash-object --stdin-paths`), so editing an already-new file counts
+  as a change. Review's `reviewInputs` uses the same list, so files inside
+  a new folder reach `reviewersFor` and the reviewers' prompt one by one.
+  Two new tests; validate, tsc (bundled types) and 161 tests pass. Not yet
+  live-tested.
 - **0.6.0 is released** (PR #18 merged, tag `v0.6.0`)
   (`docs/decisions/0015-review-fix-loop.md`, PLAN §16). The Review fix loop:
   - The Review gate lists findings with ☑/☐ (medium and up ticked). Fix
