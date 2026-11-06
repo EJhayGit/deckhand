@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0
 
 - **Limits can't be passed along.** A deck agent that the agent in use starts
   on its own gets the stricter of both agents' limits, so a read-only agent
