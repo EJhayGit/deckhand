@@ -74,6 +74,7 @@ test('/deck repeat 3 loops the next prompt, and /deck repeat stop ends it', asyn
 
   expect((await $.command.run(deck('repeat 3'))).text).toBe('Your next prompt runs 3 times.')
   await $.prompt.submit(personSays('go'))
+  await $.turn.start({ text: 'go', turnId: 'main-1' } as never)
   await $.turn.complete(turnEnds())
   expect(w.submitted).toEqual(['go', 'go'])
   expect((await $.command.run(deck('repeat stop'))).text).toBe('Repeat stopped.')

@@ -25,10 +25,16 @@ export async function onPersonPrompt($: EngineInterface, text: string): Promise<
   await showStatus($)
 }
 
-export async function onMainTurnEnd($: EngineInterface, reason: 'answer' | 'aborted' | 'refusal' | 'error'): Promise<void> {
+// A main turn started: the loop's own when it sends the loop's prompt.
+export async function onMainTurnStart($: EngineInterface, id: string, text: string): Promise<void> {
+  await update($, loop, l => (l?.isInFlight && l.turnId === undefined && text === l.prompt ? { ...l, turnId: id } : l))
+}
+
+// Only the loop's own turn moves it on.
+export async function onMainTurnEnd($: EngineInterface, reason: 'answer' | 'aborted' | 'refusal' | 'error', text: string): Promise<void> {
   const running = await read($, loop)
-  if (running === null) return
-  await apply($, afterTurn(running, reason))
+  if (running === null || text !== running.prompt) return
+  await apply($, afterTurn({ ...running, turnId: undefined }, reason))
 }
 
 export async function stopLoop($: EngineInterface): Promise<void> {
@@ -37,9 +43,9 @@ export async function stopLoop($: EngineInterface): Promise<void> {
   timer = undefined
   await update($, loop, () => null)
   await update($, repeat, () => 'once' as RepeatMode)
-  if (running?.isInFlight) {
-    const id = await read($, turnId)
-    if (id !== null) await $.turn.abort({ turnId: id }).catch(() => undefined)
+  // Cancels the loop's own turn only, never a Pipeline step's.
+  if (running?.isInFlight && running.turnId !== undefined && running.turnId === (await read($, turnId))) {
+    await $.turn.abort({ turnId: running.turnId }).catch(() => undefined)
   }
   await showStatus($)
   if (running) $.ui.toast('Loop stopped.')

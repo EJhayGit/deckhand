@@ -51,6 +51,8 @@ export type Run = {
   cost: number
   lastInput: number
   steps?: { done: number; total: number }
+  // Started by the owner's own swarm prompt, so it keeps its own limits.
+  byOwner?: boolean
 }
 
 export type DeckTab = 'deck' | 'runs' | 'swarm' | 'skills'
@@ -91,6 +93,10 @@ export type PipeRun = {
   blocked?: string
   before?: string
   agentIds?: string[]
+  // Each started agent's type, and the types the step turn must start (Review's
+  // reviewers): one missing blocks the step.
+  agentTypes?: Record<string, string>
+  expected?: string[]
   spawning?: boolean
   answers?: Record<string, { reason: string; answer: string }>
   // The fix loop: the round in flight or last run (none before the first Fix
@@ -141,7 +147,9 @@ export type SwarmDraft = { preset: string; picked: string[]; mode: SwarmMode; ta
 export type Chips = { model?: string; effort?: Effort; limits: Limits }
 
 export type RepeatMode = 'once' | 'x3' | 'm10' | 'm30' | 'm60'
-export type Loop = { mode: RepeatMode; prompt: string; run: number; isInFlight: boolean }
+// `turnId`: the loop's own turn in flight; other main turns (a Pipeline step, a
+// swarm) neither count as a run nor get cancelled by Stop.
+export type Loop = { mode: RepeatMode; prompt: string; run: number; isInFlight: boolean; turnId?: string }
 
 export type Draft = { agent: Agent; editing: string | null; starter: string; note: string | null }
 export type View = { kind: 'deck' } | { kind: 'form'; draft: Draft }

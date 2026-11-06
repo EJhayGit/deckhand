@@ -1,4 +1,4 @@
-import { atom, update } from 'claude-code'
+import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import { refreshDeck } from '../src/agents/library'
@@ -6,7 +6,7 @@ import { gatewayOptions } from '../src/gateway'
 import { codexAnswer, localAnswer } from '../src/gatewayTurn'
 import { COMMAND, runDeck } from '../src/commands'
 import { blockedNote, blockingLimit, limitsFor, offText } from '../src/limits'
-import { clearLoop, onMainTurnEnd, onPersonPrompt } from '../src/loop'
+import { clearLoop, onMainTurnEnd, onMainTurnStart, onPersonPrompt } from '../src/loop'
 import { routeOf } from '../src/models'
 import { current, isHiddenAgent, loopAgent, showStatus } from '../src/session'
 import { onPipelineAgentEnd, onPipelineBlocked, onPipelineSpawn, onPipelineTurnEnd, pipelineSpawnTitle } from '../src/pipelineRun'
@@ -16,6 +16,7 @@ import { DECK, renderDeck } from '../src/ui/deck'
 import { loadPins } from '../src/ui/skills'
 
 const turnId = atom({ plugin: 'deckhand', key: 'turnId' } as const, null as string | null)
+const swarmOpen = atom({ plugin: 'deckhand', key: 'swarmOpen' } as const, null as string | null)
 
 export const register: Register = (on, options) => {
   const gateway = gatewayOptions(options)
@@ -59,8 +60,9 @@ export const register: Register = (on, options) => {
     const step = e.resume ? undefined : await pipelineSpawnTitle($, e.parentAgentId, prompt, e.subagentType)
     const spawn = step ? { ...e, background: false, description: step } : e
     const started = await next(spawn)
-    if (!started.deny && started.agentId && !e.resume) await onSpawned($, started.agentId, e.subagentType, spawn.description, started.model)
-    if (step && !started.deny && started.agentId) await onPipelineSpawn($, started.agentId, e.parentAgentId, prompt)
+    const byOwner = e.parentAgentId === undefined && (await read($, swarmOpen)) === prompt
+    if (!started.deny && started.agentId && !e.resume) await onSpawned($, started.agentId, e.subagentType, spawn.description, started.model, byOwner)
+    if (step && !started.deny && started.agentId) await onPipelineSpawn($, started.agentId, e.parentAgentId, prompt, e.subagentType ?? '')
 
     return started
   })
@@ -78,7 +80,7 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
     if (e.agentId === undefined) {
-      await onMainTurnEnd($, e.reason)
+      await onMainTurnEnd($, e.reason, prompt)
       await closeSwarm($, prompt)
       await onPipelineTurnEnd($, prompt, e.reason)
     } else {
@@ -93,6 +95,7 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined) {
       prompt = e.text
       await update($, turnId, () => e.turnId)
+      await onMainTurnStart($, e.turnId, e.text)
     }
     return next(e)
   })

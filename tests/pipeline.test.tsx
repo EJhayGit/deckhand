@@ -279,6 +279,30 @@ test('a step that changed nothing is blocked: the run stops there and offers Ret
   await ui.unmount()
 })
 
+test('a step that only edits a file git doesn\'t track yet still counts as a change', async ($, on) => {
+  const w = world(on)
+  // a.test.ts is new from before the step; status and diff can't see it change.
+  w.outputs = {
+    'git status --porcelain': '?? a.test.ts\n',
+    'git ls-files --others --exclude-standard -z': 'a.test.ts\0',
+    'git hash-object --stdin-paths': 'aaaa\n',
+  }
+  const clock = mock.clock(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'tab-swarm' })
+  await ui.input({ key: 'swarm-task', text: 'Add dark mode' })
+  await ui.press({ key: 'size-small' })
+  await ui.press({ key: 'swarm-start' })
+  await playChat($, w, clock)
+
+  w.outputs['git hash-object --stdin-paths'] = 'bbbb\n'
+  await agentEnds($, w, clock, 'Wrote the tests.')
+  expect(await ui.find({ type: 'Text', text: 'Tests changed no files.' })).toBeUndefined()
+  expect(w.spawned).toHaveLength(2)
+  await ui.unmount()
+})
+
 test('a step whose answer says a needed tool call was blocked is blocked, even if files changed', async ($, on) => {
   const w = world(on)
   const clock = mock.clock(on)

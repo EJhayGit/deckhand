@@ -521,7 +521,7 @@ The Review step runs several reviewers side by side, merges their duplicate find
 **Open questions for the owner**
 
 - [x] Keep Lead under "More", or remove it? Removed, with swarm-lead (2026-10-29).
-- [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else the builder (2026-10-29).
+- [x] Should Pipeline's Build step use the active agent or always a fixed one? The active agent if it can edit and run, else the builder (2026-10-29). Superseded in 0.6.0 (§16, decision 0015): Build never uses the agent in use; it's the builder, or the bug-fixer for a Fix.
 - [x] Any agent to add to or drop from the swap list in Milestone 2? Added committer, code-explorer, silent-failure-hunter and code-simplifier (2026-10-29).
 
 ## 15. 0.5.0: the deck as cards (2026-10-29)
@@ -561,3 +561,20 @@ back to Build and get re-reviewed (`docs/decisions/0015-review-fix-loop.md`):
   it with a message.
 - Runs tags each round's agents `Round 2/3 · Build`; step cards show each
   round's tokens and cost.
+
+## 17. 0.7.0: issue #19 and the audit fixes (2026-11-06)
+
+Issue #19 (a step that only edits an untracked file was "changed no files")
+and an audit of the whole mod. Built in one PR:
+
+- Untracked files count by content in the "changed nothing" check, and
+  Review lists every new file, inside new folders too.
+- Limits hold through subagents (`docs/decisions/0016-limits-hold-through-subagents.md`):
+  a deck agent that the agent in use starts gets the stricter of both; Review's
+  agents never edit; Codex writes only with Edit and Run on.
+- Review blocks when the chat skipped a reviewer it was asked to start.
+- A fix round brings back a ticked finding whose code is still in the file.
+- Repeat counts only its own turns, and Stop cancels only its own turn.
+
+Not done: a Deckhand icon (`.claude-plugin/icon.png`; validate warns), and
+a test for the guard's catch when a hook beneath it throws.

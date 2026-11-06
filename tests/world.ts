@@ -24,6 +24,9 @@ export type World = {
   spawned: { subagentType: string; description: string; prompt: string; background?: boolean }[]
   // Set: agent.spawn refuses with this reason.
   spawnDeny?: string
+  // Agent types playChat leaves out, or swaps (`from` -> `to`), as a chat that ignores the prompt.
+  skip?: string[]
+  swap?: Record<string, string>
   commands: { name: string; description: string; source: 'builtin' | 'plugin' | 'user' | 'mcp'; plugin?: string }[]
   // playChat: prompts already played, and the open chat turn's agents.
   played: number
@@ -211,7 +214,8 @@ export async function playChat($: Engine, w: World, clock: Clock) {
     if (!text.startsWith('Start the `') && !text.startsWith('Deckhand pipeline')) continue
     await $.turn.start({ turnId: `t${w.played}`, text } as never)
     w.open = []
-    for (const type of typesIn(text)) {
+    for (const asked of typesIn(text).filter(t => !w.skip?.includes(t))) {
+      const type = w.swap?.[asked] ?? asked
       const before = w.spawned.length
       await $.agent.spawn({ subagentType: type, prompt: text, description: 'picked by the model' } as never).catch(() => undefined)
       if (w.spawned.length > before) w.open.push(`a${w.spawned.length}`)

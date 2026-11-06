@@ -5,6 +5,13 @@ import type { Engine } from 'claude-code/testing'
 import { afterTurn, start, tick } from '../src/repeat'
 import { PANE, START, agentFile, personSays, turnEnds, world } from './world'
 
+let turns = 0
+// One main turn sending `text`, as the engine runs it: start, then end.
+async function turn($: Engine, text: string, reason: 'answer' | 'aborted' | 'error' = 'answer') {
+  await $.turn.start({ text, turnId: `main-${++turns}` } as never)
+  await $.turn.complete(turnEnds(reason))
+}
+
 test('pure: 3× runs three times, then stops as done', () => {
   let loop = start('x3', 'fix it', null)!
   expect(loop.run).toBe(1)
@@ -50,12 +57,12 @@ test('3× resends the prompt after each turn and stops after the third', async (
 
   await $.prompt.submit(personSays('review src'))
   expect(await band.find({ key: 'stop' })).toBeDefined()
-  await $.turn.complete(turnEnds())
+  await turn($, 'review src')
   expect(w.submitted).toEqual(['review src', 'review src'])
   expect(await band.find({ key: 'stop' })).toBeDefined()
-  await $.turn.complete(turnEnds())
-  await $.turn.complete(turnEnds())
-  await $.turn.complete(turnEnds())
+  await turn($, 'review src')
+  await turn($, 'review src')
+  await turn($, 'review src')
 
   expect(w.submitted).toEqual(['review src', 'review src', 'review src'])
   expect(w.toasts.at(-1)).toBe('Loop done.')
@@ -73,7 +80,7 @@ test('a timer resends every 10 minutes after the turn ends, and only then', asyn
   await clock.advance(20 * 60_000)
   expect(w.submitted).toEqual(['check CI'])
 
-  await $.turn.complete(turnEnds())
+  await turn($, 'check CI')
   await clock.advance(9 * 60_000)
   expect(w.submitted).toEqual(['check CI'])
   await clock.advance(60_000)
@@ -91,8 +98,8 @@ test('Stop ends a timer loop: no more sends, and the running turn is cancelled',
   await $.session.start(START)
   const band = await setup($, 'm30')
 
-  await $.turn.start({ text: 'watch', turnId: 'main-1' })
   await $.prompt.submit(personSays('watch'))
+  await $.turn.start({ text: 'watch', turnId: 'main-1' } as never)
   await band.press({ key: 'stop' })
   expect(w.aborted).toEqual(['main-1'])
   expect(w.toasts.at(-1)).toBe('Loop stopped.')
@@ -111,7 +118,7 @@ test('Stop while waiting cancels the timer', async ($, on) => {
   const band = await setup($, 'm60')
 
   await $.prompt.submit(personSays('nightly'))
-  await $.turn.complete(turnEnds())
+  await turn($, 'nightly')
   await band.press({ key: 'stop' })
   await clock.advance(3 * 60 * 60_000)
 
@@ -127,7 +134,7 @@ test('an error stops the loop', async ($, on) => {
   const band = await setup($, 'x3')
 
   await $.prompt.submit(personSays('go'))
-  await $.turn.complete(turnEnds('error'))
+  await turn($, 'go', 'error')
   await clock.advance(60 * 60_000)
 
   expect(w.submitted).toEqual(['go'])
@@ -147,7 +154,26 @@ test("a subagent's turn end does not advance the loop, and Once never loops", as
   await band.press({ key: 'stop' })
   await band.press({ key: 'repeat-once' })
   await $.prompt.submit(personSays('again'))
-  await $.turn.complete(turnEnds())
+  await turn($, 'again')
   expect(w.submitted).toEqual(['go', 'again'])
+  await band.unmount()
+})
+
+test('another main turn (a Pipeline step) neither counts as a loop run nor is cancelled by Stop', async ($, on) => {
+  const w = world(on, { '.claude/agents/reviewer.md': agentFile('reviewer') })
+  mock.clock(on)
+  await $.session.start(START)
+  const band = await setup($, 'x3')
+
+  await $.prompt.submit(personSays('go'))
+  await turn($, 'go')
+  expect(w.submitted).toEqual(['go', 'go'])
+  // A step prompt runs its own turn while the loop's second run is queued.
+  await turn($, 'Start the `deckhand:builder` agent ...')
+  await turn($, 'Start the `deckhand:builder` agent ...')
+  expect(w.submitted).toEqual(['go', 'go'])
+  await $.turn.start({ text: 'Start the `deckhand:planner` agent ...', turnId: 'step' } as never)
+  await band.press({ key: 'stop' })
+  expect(w.aborted).toEqual([])
   await band.unmount()
 })

@@ -39,11 +39,15 @@ export function ollamaAnswer(text: string): string | undefined {
   }
 }
 
-// Codex runs in its own sandbox: it may write the project only with Edit files on.
+// Codex runs in its own sandbox. It edits and reads through its own shell, so
+// it may write only with both Edit files and Run commands on; otherwise the
+// read-only sandbox holds (fails closed).
+// shortcut: with Run off Codex can still run commands that only read (its way to read files); the sandbox can't tell them apart.
 export function codexArgv(command: string, prompt: string, limits: Limits): string[] {
-  return [command, 'exec', '--skip-git-repo-check', '--sandbox', limits.edit ? 'workspace-write' : 'read-only', prompt]
+  return [command, 'exec', '--skip-git-repo-check', '--sandbox', limits.edit && limits.run ? 'workspace-write' : 'read-only', prompt]
 }
 
-export function codexPrompt(instructions: string, task: string): string {
-  return instructions.trim() === '' ? task : `${instructions.trim()}\n\nTask: ${task}`
+export function codexPrompt(instructions: string, task: string, limits?: Limits): string {
+  const off = limits && !limits.run ? '\n\nRun no commands except to read files.' : ''
+  return instructions.trim() === '' ? `${task}${off}` : `${instructions.trim()}${off}\n\nTask: ${task}`
 }

@@ -1,6 +1,31 @@
 # Changelog
 
-## 0.6.0 (unreleased)
+## 0.7.0 (unreleased)
+
+- **Limits can't be passed along.** A deck agent that the agent in use starts
+  on its own gets the stricter of both agents' limits, so a read-only agent
+  can't hand an edit to the fixer. Agents you start yourself (a Pipeline
+  step, a swarm) keep their own.
+- **Review's agents never edit**, even when the chat starts them as another
+  type (say `general-purpose`).
+- **A Review that skipped a reviewer is blocked**, not passed: if the chat
+  doesn't start every reviewer it was asked for (say security-auditor), the
+  step stops with Retry.
+- **Fix rounds check the code.** A ticked finding whose code is still in the
+  file comes back as "(still in the code)", even if the reviewers didn't
+  report it again.
+- **Repeat counts only its own turns.** A Pipeline step or swarm turn no
+  longer counts as a loop run, and Stop cancels only the loop's own turn.
+- **Codex with Run commands off** stays in the read-only sandbox (it edits
+  through its own shell) and is told to run commands only to read files.
+- **Fix (#19):** a Build or Tests step that only edited a file git doesn't
+  track yet was blocked as "changed no files". Untracked files now count by
+  their content.
+- **Fix:** Review saw a new folder as one name (`src/auth/`), so it could
+  skip the TypeScript reviewer and listed the folder, not its files. It now
+  lists each new file.
+
+## 0.6.0
 
 - **Review has a fix loop.** At the Review stop, findings have checkboxes
   (medium and up ticked). **Fix these** sends the ticked ones and your note
@@ -16,7 +41,7 @@
   tokens and cost. Step prompts name the agent first so auto mode allows
   the start.
 
-## 0.5.0 (unreleased)
+## 0.5.0
 
 - **The Deck looks like a deck.** Each agent is a card in a grid with its
   icon, name, status (`● in use`, `▶ running 1`, `○ ready`), model and what
@@ -32,7 +57,7 @@
 - A pending Delete stays on screen until you answer it, even with the card's
   menu closed. The step agent picker closes once its step starts.
 
-## 0.4.0 (unreleased)
+## 0.4.0
 
 - **The Pipeline waits for each step's agent.** Before, a step sent through
   the chat finished as soon as the chat's own turn ended, even when the agent
@@ -55,7 +80,7 @@
 - The agent in use is told which tools are off for it, so it stops trying them.
 - The panel's title shows the version, like `Deck v0.4.0`.
 
-## 0.3.3 (unreleased)
+## 0.3.3
 
 - **New built-in agent: builder.** It builds a feature from a plan, slice by
   slice, keeping the checks green (adapted from ECC, credited in
@@ -66,7 +91,7 @@
 - The Build step now says not to commit. Commit is its own step after Review
   and your OK, and an early commit would leave Review an empty diff.
 
-## 0.3.2 (unreleased)
+## 0.3.2
 
 - **Pipeline steps are real subagents:** Deckhand starts each step's agent
   itself and saves its answer as the step's result. Nothing is typed into
@@ -80,7 +105,7 @@
 - Start refuses a step whose agent runs on a Local or Codex model, because
   those can't be subagents.
 
-## 0.3.1 (unreleased)
+## 0.3.1
 
 - **Pipeline step agents:** each step runs with an agent suited to it
   (researcher, planner, test-writer, a fixer for Build, reviewer, plain
@@ -94,7 +119,7 @@
   nothing, stops the run there with **Retry** and **Change agent**, instead
   of moving on.
 
-## 0.3.0 (unreleased)
+## 0.3.0
 
 - **Skills tab:** every installed skill, grouped and searchable. Run one with
   a note, pin favorites per project, or add one to the agent in use.

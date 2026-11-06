@@ -2,6 +2,27 @@
 
 ## State
 
+- **0.7.0 (branch `claude/reload-plugins-ab118d`, not merged):** issue #19
+  plus the 2026-11-06 audit (PLAN §17, decision 0016):
+  - #19: `filesState` in `src/pipelineRun.ts` adds each untracked file
+    (`git ls-files --others --exclude-standard -z`) and its content hash
+    (`git hash-object --stdin-paths`). `reviewInputs` uses the same list, so
+    files inside a new folder reach `reviewersFor` and the prompt one by one.
+  - Limits: `limitsFor` gives a deck subagent that the agent in use started
+    the stricter of both; owner-picked loops (step, swarm: `byOwner` on the
+    Runs row) keep their own. Any Review-step agent has Edit off.
+  - Review: the run saves the reviewer types it asked for (`expected`) and
+    each spawn's type (`agentTypes`); a missing one blocks at turn end.
+  - Fix rounds: `withUnfixed` (`src/findings.ts`) brings back a sent
+    finding whose code snippet is still in its file.
+  - Repeat: `Loop.turnId`; only the loop's own turn moves it on or is
+    cancelled by Stop.
+  - Codex: `workspace-write` only with Edit and Run both on.
+  - A Pipeline after a mod reload: checked, no change needed. Reloads run
+    between turns, `$.state` keeps the run, and the next `turn.start` sets
+    the hook's prompt again.
+  - Checks: validate passes, tsc clean (`npx -p typescript`, main
+    checkout's types), 165 tests pass. Not yet live-tested.
 - **0.6.0 is released** (PR #18 merged, tag `v0.6.0`)
   (`docs/decisions/0015-review-fix-loop.md`, PLAN §16). The Review fix loop:
   - The Review gate lists findings with ☑/☐ (medium and up ticked). Fix
@@ -78,23 +99,23 @@ Put on step after an ended run isn't visible until Clear; dead skill cards
 for uninstalled pinned skills; step notes don't name their step; "needs
 <plugin>" can overflow a narrow card.
 
-Possible follow-up: Review gets an empty diff when every file is new; adding
-untracked files to the saved diff (`git add -N` or `git diff --no-index`)
-would give the reviewers the real text.
+Review now names every new file to the reviewers one by one (0.7.0); the
+saved diff still holds only tracked changes.
 
 ## Open items
 
 - Owner's open questions from the master plan, built with these defaults:
-  Lead is removed (with swarm-lead); the swap list as given. Build now uses
-  the agent in use only if it can edit and run (decision 0011).
+  Lead is removed (with swarm-lead); the swap list as given. Build never uses
+  the agent in use (decision 0015).
 - Live: auto mode refuses the plugin's own `$.agent.spawn` from Start, so
   0.4.0 sends every step through the chat (works). The `background: false`
   rewrite is ignored by the desktop app; harmless. Stop can't kill a running
   agent; its late answer is ignored.
 - silent-failure-hunter isn't in Review's reviewer list; add it there if the
   owner wants it to run on every Review.
-- "Changed nothing" compares `git status` + `git diff HEAD` before and after
-  Tests/Build; gitignored-only changes count as nothing, and Commit isn't
+- "Changed nothing" compares `git status`, `git diff HEAD` and untracked
+  files' hashes before and after Tests/Build; gitignored-only changes count
+  as nothing, and Commit isn't
   checked. Still to confirm live that the guard's denial reaches the step.
 - Still to confirm live: `$.command.run` from
   a button runs a plugin skill; each reviewer's own answer is only its

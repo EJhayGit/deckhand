@@ -28,10 +28,12 @@ export const PROGRESS_TOOL = {
 // The module's own: redraws the clocks once a second while anything runs.
 let ticker: { cancel: () => void } | undefined
 
-export async function onSpawned($: EngineInterface, agentId: string, subagentType: string | undefined, description: string, model: string): Promise<void> {
+// `byOwner`: the main chat started it during the owner's own swarm or step prompt.
+export async function onSpawned($: EngineInterface, agentId: string, subagentType: string | undefined, description: string, model: string, byOwner: boolean): Promise<void> {
   const name = (subagentType ?? '').replace(/^deckhand:/, '')
   const card = (await read($, deck)).find(c => c.agentType === subagentType || c.agent.name === name)
   const run = newRun({
+    ...(byOwner ? { byOwner } : {}),
     agentId,
     title: description || name || 'Agent',
     name: card?.agent.name ?? (name || 'agent'),

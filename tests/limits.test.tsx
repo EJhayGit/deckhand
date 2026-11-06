@@ -15,7 +15,7 @@ const CALLS = [
 
 async function useAgent($: Engine, name: string) {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  await ui.press({ key: `use-${name}` })
+  await ui.press({ key: name === 'none' ? 'none' : `use-${name}` })
   await ui.unmount()
 }
 
@@ -141,7 +141,7 @@ test('the guard fails closed: when it cannot read the active agent, the call is 
   expect(JSON.stringify(result)).toContain('limit check failed')
 })
 
-test('a deck subagent keeps its own limits; any other subagent gets the agent in use\'s', async ($, on) => {
+test('a deck subagent the agent in use starts gets the stricter limits; any other subagent the agent in use\'s', async ($, on) => {
   world(on, { '.claude/agents/reviewer.md': agentFile('reviewer'), '.claude/agents/fixer.md': agentFile('fixer', '{ edit: true, run: true, internet: false }') })
   mock.clock(on)
   const ran: string[] = []
@@ -155,9 +155,13 @@ test('a deck subagent keeps its own limits; any other subagent gets the agent in
 
   const fixer = await $.agent.spawn({ subagentType: 'fixer', prompt: 'Fix it.', description: 'fix' } as never)
   const general = await $.agent.spawn({ subagentType: 'general-purpose', prompt: 'Fix it.', description: 'fix' } as never)
-  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (fixer as { agentId: string }).agentId } as never))).not.toContain('Blocked')
-  expect(ran).toEqual(['Edit'])
+  // The read-only reviewer can't hand an edit to the fixer.
+  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (fixer as { agentId: string }).agentId } as never))).toContain('Blocked: fixer (started by reviewer)')
   expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (general as { agentId: string }).agentId } as never))).toContain('Blocked: reviewer')
   expect(JSON.stringify(await $.tool.call({ ...edit, agentId: 'unknown' } as never))).toContain('Blocked: reviewer')
+  expect(ran).toEqual([])
+  // With nothing in use, the fixer keeps its own.
+  await useAgent($, 'none')
+  expect(JSON.stringify(await $.tool.call({ ...edit, agentId: (fixer as { agentId: string }).agentId } as never))).not.toContain('Blocked')
   expect(ran).toEqual(['Edit'])
 })

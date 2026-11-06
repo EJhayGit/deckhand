@@ -2,7 +2,8 @@
 
 The step-to-agent table, preflight and blocked steps still hold. How each
 step runs (switching the agent in use) is replaced by
-`0012-pipeline-subagents.md`.
+`0012-pipeline-subagents.md`. Build's row is replaced by
+`0015-review-fix-loop.md`: Build never uses the agent in use.
 
 Date: 2026-10-29. Replaces 0007's rule "Build and Commit use the agent that
 was in use when the run started".
