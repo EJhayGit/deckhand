@@ -40,10 +40,19 @@ export function toolLists(agent: Agent): { tools?: string[]; disallowedTools?: s
   return { tools, disallowedTools }
 }
 
-// Whose limits hold for a loop: its own (a deck subagent, or a Pipeline
-// step's), else the agent in use. Neither: no limits.
-export function limitsFor<T>(own: T | undefined, active: T | undefined): T | undefined {
-  return own ?? active
+// A loop's name and limits. `isOwners`: the owner picked it (a Pipeline step,
+// a swarm), so its own limits hold as they are.
+export type Holder = { name: string; limits: Limits; isOwners?: boolean }
+
+// Whose limits hold for a loop: its own, else the agent in use's; neither, no
+// limits. A subagent the agent in use started on its own gets the stricter of
+// both, so a read-only agent can't hand blocked work to a looser one.
+export function limitsFor(own: Holder | undefined, active: Holder | undefined): Holder | undefined {
+  if (!own || !active || own.isOwners) return own ?? active
+  const limits = Object.fromEntries(LIMITS.map(l => [l, own.limits[l] === true && active.limits[l] === true])) as Limits
+  const isTighter = LIMITS.some(l => limits[l] !== (own.limits[l] === true))
+
+  return isTighter ? { name: `${own.name} (started by ${active.name})`, limits } : own
 }
 
 // Told to the agent in use, so it doesn't try tools the guard will deny.

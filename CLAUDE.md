@@ -48,13 +48,17 @@ starter templates; `PLAN.md` wins over them. Design choices go in
 - Pure modules (tested without the engine): `src/agents/format.ts`,
   `src/limits.ts`, `src/repeat.ts`, `src/models.ts`, `src/gateway.ts`,
   `src/ui/status.ts`, `src/skills.ts`, `src/pipeline.ts`, `src/findings.ts`.
-- The Pipeline (`src/pipelineRun.ts`) spawns each step's agent itself with
-  `$.agent.spawn` and saves that subagent's `turn.complete` answer as the
-  step's result file. It never changes the agent in use
-  (`docs/decisions/0012-pipeline-subagents.md`).
+- The Pipeline (`src/pipelineRun.ts`) sends each step to the chat as one
+  visible prompt that asks it to start the step's agent(s). It records the
+  agents that turn starts (and their types; Review blocks if a reviewer is
+  missing) and saves their own `turn.complete` answer as the step's result
+  file. It never changes the agent in use
+  (`docs/decisions/0013-pipeline-through-chat.md`).
 - The `tool.call` guard gives a subagent its own limits (`loopAgent` in
-  `src/session.ts`): a Pipeline step's agent, or a deck agent by its Runs
-  row. Every other loop gets the agent in use's limits.
+  `src/session.ts`, `limitsFor` in `src/limits.ts`). Owner-picked loops (a
+  Pipeline step's agent, a swarm agent) keep their own; Review's agents never
+  edit. A deck agent that the agent in use started gets the stricter of both.
+  Every other loop gets the agent in use's limits.
 - An active agent applies through hooks: `prompt.compose` adds its
   instructions, `turn.step` rewrites model and effort for the main loop only
   (`e.agentId === undefined`) or answers Local/Codex turns itself, and
@@ -63,7 +67,9 @@ starter templates; `PLAN.md` wins over them. Design choices go in
   fetches). The engine hands hooks absolute paths; the world maps them back.
 - Until the mod has loaded once, the API types aren't in `.claude-plugin/types/`:
   type-check with a temporary tsconfig that extends this one and includes the
-  bundled `claude-code.d.ts` named by the plugin-authoring skill.
+  bundled `claude-code.d.ts` named by the plugin-authoring skill (or the main
+  checkout's `.claude-plugin/types`). TypeScript isn't installed in the repo:
+  run it as `npx -y -p typescript tsc -p <that tsconfig>`.
 - Check mod API calls by grepping `.claude-plugin/types/claude-code/index.d.ts`
   rather than reading the whole file.
 

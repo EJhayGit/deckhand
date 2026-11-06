@@ -225,6 +225,17 @@ export function progress(previous: readonly Finding[], now: readonly Finding[], 
   return round >= cap ? { kind: 'cap' } : { kind: 'again' }
 }
 
+// A fix round's review, checked against the files: a finding sent to Build
+// whose code is still in its file isn't fixed, whatever the reviewers said, so
+// it comes back. `texts`: each file's text now; undefined, the file is gone.
+export function withUnfixed(now: readonly Finding[], sent: readonly Finding[], texts: Readonly<Record<string, string | undefined>>): Finding[] {
+  const seen = new Set(now.map(keyOf))
+  const back = sent.filter(f => !seen.has(keyOf(f)) && normalize(texts[f.file] ?? '').includes(normalize(f.evidence)))
+  const top = Math.max(0, ...now.map(f => f.id))
+
+  return [...now, ...back.map((f, i) => ({ ...f, id: top + i + 1, title: `${f.title} (still in the code)`, pick: undefined }))]
+}
+
 export function brakeText(p: Progress, round: number, cap: number): string | undefined {
   const row = (f: Finding) => `- [${f.severity}] ${f.file}:${f.line} ${f.title}`
   if (p.kind === 'stuck') return `Fix loop stopped after round ${round}: no progress, ${p.reason}.`

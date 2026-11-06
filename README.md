@@ -111,12 +111,16 @@ agent, stops with **Retry** and **Change agent**. Each answer is saved to
 **Review** starts reviewer, plus typescript-reviewer for TypeScript and
 security-auditor for security-sensitive changes, merges their duplicate
 findings, and has the skeptic agent re-check every serious one. Only findings
-it proves stay; medium and low ones show as advice.
+it proves stay; medium and low ones show as advice. If the chat skips a
+reviewer it was asked to start, Review stops with **Retry** instead of
+passing, and Review's agents can never edit.
 
 At the Review stop each finding has a checkbox: medium and up are ticked,
 low and refuted ones aren't. **Fix these** writes the ticked ones and your
 note to `.deckhand/pipeline/<run>/<nn>-fixes.md`, runs Build on just those,
-then reviews that round's change. That's one round; rounds go on by
+then reviews that round's change. A ticked finding whose code is still in the
+file comes back marked "(still in the code)", even if the reviewers miss it.
+That's one round; rounds go on by
 themselves until the review is clean (back to the stop, then **Approve**),
 or a brake stops them with the reason: **Max rounds** (chip, 1 to 5,
 default 3), **no progress** (the same findings back, or no fewer), or
@@ -150,9 +154,12 @@ and a progress bar, with totals on top. Cost is an estimate from list prices.
 - **Can:** Edit files, Run commands, Internet. A new agent starts with all
   three off (read only). A blocked call shows a toast and a note in the chat,
   for example: "Blocked: reviewer tried to run `npm install`, but Run commands
-  is off for this agent."
+  is off for this agent." A deck agent that the agent in use starts by itself
+  gets the stricter of both agents' limits; agents you start (a Pipeline step,
+  a swarm) keep their own.
 - **Repeat:** Once, 3×, 10 min, 30 min, 60 min. Pick one, then send a prompt.
-  **Stop** shows while a loop runs.
+  **Stop** shows while a loop runs. Only the loop's own turns count; a
+  Pipeline step in between doesn't.
 - **Save to agent** appears when the chips differ from the agent's file.
 
 Chip changes apply to this session at once.
@@ -191,7 +198,7 @@ the agent in use (marked ●). Click one to open it on the Skills tab.
   models answer in text only here: they don't read files or run commands.
 - **Codex** runs `codex exec` in the project folder. Install the
   [Codex CLI](https://github.com/openai/codex) and sign in first. Codex is read
-  only unless the agent's Edit files is on.
+  only unless the agent's Edit files and Run commands are both on.
 
 Change the server, default model or Codex command in the mod's settings
 (`/config`, under deckhand).

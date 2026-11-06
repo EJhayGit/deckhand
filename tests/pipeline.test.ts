@@ -81,10 +81,14 @@ test('preflight: an agent on a Local or Codex model can\'t run as a subagent', (
   expect(shortfallText(short[0]!)).toBe('Build: local runs on a Local or Codex model and can\'t run as a subagent.')
 })
 
-test('a loop keeps its own limits, else the agent in use\'s', () => {
-  const own = { name: 'test-writer', limits: BUILD }
+test('a loop the owner picked keeps its own limits; one the agent in use started gets the stricter of both', () => {
+  const step = { name: 'test-writer', limits: BUILD, isOwners: true }
+  const sub = { name: 'test-writer', limits: BUILD }
   const active = { name: 'researcher', limits: READ }
-  expect(limitsFor(own, active)).toBe(own)
+  expect(limitsFor(step, active)).toBe(step)
+  expect(limitsFor(sub, active)).toEqual({ name: 'test-writer (started by researcher)', limits: { edit: false, run: false, internet: false } })
+  expect(limitsFor(sub, { name: 'all', limits: { edit: true, run: true, internet: true } })).toBe(sub)
+  expect(limitsFor(sub, undefined)).toBe(sub)
   expect(limitsFor(undefined, active)).toBe(active)
   expect(limitsFor(undefined, undefined)).toBeUndefined()
 })

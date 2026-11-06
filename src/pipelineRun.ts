@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { DeckAgent, DeckTab, Finding, PipeKind, PipeRun, PipeSize, PipeStepId, Pipeline } from '../types'
-import { applyVerdicts, brakeText, changedFiles, fixesText, isPicked, isSerious, joinReviews, mergeFindings, parseFindings, progress, reportText, reviewPrompt, reviewersFor, roundsCap, skepticPrompt, togglePick } from './findings'
+import { applyVerdicts, brakeText, changedFiles, fixesText, isPicked, isSerious, joinReviews, mergeFindings, parseFindings, progress, reportText, reviewPrompt, reviewersFor, roundsCap, skepticPrompt, togglePick, withUnfixed } from './findings'
 import { routeOf } from './models'
 import { KEEP, STEP_LABEL, after, blockedIn, chatPrompt, editsFiles, fileOf, fixesOf, newPipeline, planBump, preflight, runId, shortText, shortfallText, stepHead, stepPrompt, stopsStep, typeOf, withAgent } from './pipeline'
 import type { Installed, PipeEvent } from './pipeline'
@@ -67,8 +67,10 @@ export async function pipelineSpawnTitle($: EngineInterface, parentAgentId: stri
   return `${at} · ${STEP_LABEL[run.steps[i]!.id]}${who}`
 }
 
-export async function onPipelineSpawn($: EngineInterface, agentId: string, parentAgentId: string | undefined, turnPrompt: string): Promise<void> {
-  await update($, pipeline, p => (isStepTurn(p.run, parentAgentId, turnPrompt) ? { ...p, run: { ...p.run, agentIds: [...(p.run.agentIds ?? []), agentId] } } : p))
+export async function onPipelineSpawn($: EngineInterface, agentId: string, parentAgentId: string | undefined, turnPrompt: string, agentType: string): Promise<void> {
+  await update($, pipeline, p => (isStepTurn(p.run, parentAgentId, turnPrompt)
+    ? { ...p, run: { ...p.run, agentIds: [...(p.run.agentIds ?? []), agentId], agentTypes: { ...p.run.agentTypes, [agentId]: agentType } } }
+    : p))
 }
 
 // The step's chat turn ended. Its own reply is never the result: the step
@@ -79,6 +81,13 @@ export async function onPipelineTurnEnd($: EngineInterface, prompt: string, reas
   const i = run.steps.findIndex(s => s.status === 'running')
   if (i < 0) return
   const next = { ...run, prompt: null, spawning: undefined }
+  // A review that skipped a reviewer didn't happen: block it (fail closed).
+  const started = Object.values(run.agentTypes ?? {})
+  const missing = (run.expected ?? []).filter(t => !started.includes(t))
+  if (next.agentIds?.length && missing.length) {
+    await apply($, next, { kind: 'blocked', reason: `The chat didn't start ${missing.map(t => t.replace(/^deckhand:/, '')).join(', ')}. Retry.` })
+    return
+  }
   if (!next.agentIds?.length) {
     if (reason !== 'answer') {
       await finishStep($, next, i, reason, '')
@@ -181,7 +190,7 @@ async function event($: EngineInterface, e: PipeEvent) {
 
 // Saves the run after an event, and starts the next step if there is one.
 async function apply($: EngineInterface, run: PipeRun, e: PipeEvent) {
-  const { run: next, next: index } = after({ ...run, prompt: null, agentIds: undefined, answers: undefined, spawning: undefined }, e)
+  const { run: next, next: index } = after({ ...run, prompt: null, agentIds: undefined, agentTypes: undefined, expected: undefined, answers: undefined, spawning: undefined }, e)
   await update($, pipeline, p => ({ ...p, run: next, note: '' }))
   const blocked = next.steps.find(s => s.status === 'blocked')
   if (index !== null) {
@@ -203,6 +212,7 @@ async function sendStep($: EngineInterface, run: PipeRun, index: number) {
   const step = run.steps[index]!
   const cards = await read($, deck)
   let prompt: string
+  let expected: string[] | undefined
   if (step.id === 'review' && run.phase === 'skeptic') {
     prompt = chatPrompt(typeOf('skeptic', cardsOf(cards)), skepticPrompt(stepHead(run, index), diffOf(run, index), (run.findings ?? []).filter(isSerious)))
   } else if (step.id === 'review') {
@@ -212,6 +222,7 @@ async function sendStep($: EngineInterface, run: PipeRun, index: number) {
       return
     }
     const agents = review.names.map(name => ({ name, type: typeOf(name, cardsOf(cards)) }))
+    expected = agents.map(a => a.type)
     prompt = reviewPrompt(stepHead(run, index), review.diffFile, review.untracked, agents, run.round ? fixesOf(run) : undefined)
   } else {
     if (step.agent !== null && !cards.some(c => c.agent.name === step.agent)) {
@@ -232,7 +243,7 @@ async function sendStep($: EngineInterface, run: PipeRun, index: number) {
   }
   const before = step.id !== 'review' && editsFiles(run, index) ? await filesState($) : run.before
   const steps = run.steps.map((s, j) => (j === index ? { ...s, status: 'running' as const, summary: undefined, error: undefined } : s))
-  await update($, pipeline, p => ({ ...p, run: { ...run, steps, prompt, before, blocked: undefined, agentIds: [], answers: {}, spawning: true } }))
+  await update($, pipeline, p => ({ ...p, run: { ...run, steps, prompt, before, blocked: undefined, agentIds: [], agentTypes: {}, expected, answers: {}, spawning: true } }))
   // The built-in agents are offered to the model until this turn ends.
   await update($, swarmOpen, () => prompt)
   // Later: this can run inside the last turn's turn.complete, which still holds the chat.
@@ -323,7 +334,11 @@ async function onReviewEnd($: EngineInterface, run: PipeRun, index: number, answ
   await sendStep($, { ...run, findings, phase: 'skeptic' }, index)
 }
 
-async function finishReview($: EngineInterface, run: PipeRun, index: number, findings: Finding[]) {
+async function finishReview($: EngineInterface, run: PipeRun, index: number, reviewed: Finding[]) {
+  const sent = run.round ? (run.previous ?? []).filter(isPicked) : []
+  const texts: Record<string, string | undefined> = {}
+  for (const file of new Set(sent.map(f => f.file))) texts[file] = await $.fs.read(file).catch(() => undefined)
+  const findings = withUnfixed(reviewed, sent, texts)
   const text = reportText(findings)
   await $.fs.write(fileOf(run, index), text)
   const steps = run.steps.map((s, j) => (j === index ? { ...s, summary: shortText(text, 20) } : s))

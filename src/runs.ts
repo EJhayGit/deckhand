@@ -10,7 +10,7 @@ export type Usage = {
   cache_creation_input_tokens: number
 }
 
-export type RunStart = { agentId: string; title: string; name: string; model: string; effort?: Effort; color?: string; hat?: Hat }
+export type RunStart = { agentId: string; title: string; name: string; model: string; effort?: Effort; color?: string; hat?: Hat; byOwner?: boolean }
 
 export function newRun(s: RunStart, now: number): Run {
   return { ...s, hat: s.hat ?? 'none', startedAt: now, status: 'running', tokens: 0, cost: 0, lastInput: 0 }

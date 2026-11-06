@@ -31,7 +31,7 @@ export async function localAnswer($: EngineInterface, options: GatewayOptions, a
 }
 
 export async function codexAnswer($: EngineInterface, options: GatewayOptions, agent: Agent, limits: Limits, prompt: string): Promise<string> {
-  const argv = codexArgv(options.codexCommand, codexPrompt(agent.body, prompt), limits)
+  const argv = codexArgv(options.codexCommand, codexPrompt(agent.body, prompt, limits), limits)
   const ran = await $.process.run(argv, { timeoutMs: 600_000 }).catch((error: unknown) => String(error))
   if (typeof ran === 'string') {
     return `Deckhand couldn't start Codex (\`${options.codexCommand}\`). Install the Codex CLI and sign in, then try again.\n${ran}`

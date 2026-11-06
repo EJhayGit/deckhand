@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { codexArgv, gatewayOptions, ollamaAnswer, ollamaRequest } from '../src/gateway'
+import { codexArgv, codexPrompt, gatewayOptions, ollamaAnswer, ollamaRequest } from '../src/gateway'
 import { PANE, START, agentFile, world } from './world'
 
 const STEP = { turnId: 't1', index: 0, model: 'claude-sonnet-5-5', messageCount: 1 } as const
@@ -31,9 +31,12 @@ test('pure: options fall back to defaults, and requests are shaped for Ollama', 
   expect(ollamaAnswer('nope')).toBe(undefined)
 })
 
-test('pure: Codex is read only unless Edit files is on', () => {
+test('pure: Codex is read only unless Edit files and Run commands are both on', () => {
   expect(codexArgv('codex', 'go', { edit: false, run: true, internet: false })).toEqual(['codex', 'exec', '--skip-git-repo-check', '--sandbox', 'read-only', 'go'])
-  expect(codexArgv('codex', 'go', { edit: true, run: false, internet: false })[4]).toBe('workspace-write')
+  expect(codexArgv('codex', 'go', { edit: true, run: false, internet: false })[4]).toBe('read-only')
+  expect(codexArgv('codex', 'go', { edit: true, run: true, internet: false })[4]).toBe('workspace-write')
+  expect(codexPrompt('Be brief.', 'go', { edit: true, run: false, internet: false })).toBe('Be brief.\n\nRun no commands except to read files.\n\nTask: go')
+  expect(codexPrompt('', 'go', { edit: true, run: true, internet: false })).toBe('go')
 })
 
 test('a Local agent is answered by Ollama, keeps its own history, and never reaches Claude', async ($, on) => {
@@ -83,7 +86,7 @@ test('a Codex agent runs codex exec in the project, read only by default', async
 
   const chunks = await ask($, 'tidy the README')
 
-  expect(w.runs.at(-1)).toEqual(['codex', 'exec', '--skip-git-repo-check', '--sandbox', 'read-only', 'Do cx things.\n\nTask: tidy the README'])
+  expect(w.runs.at(-1)).toEqual(['codex', 'exec', '--skip-git-repo-check', '--sandbox', 'read-only', 'Do cx things.\n\nRun no commands except to read files.\n\nTask: tidy the README'])
   expect(chunks).toContainEqual({ kind: 'text', index: 0, text: 'Codex says done.' })
 })
 

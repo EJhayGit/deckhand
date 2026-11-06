@@ -114,6 +114,34 @@ test('the chat starts the reviewers side by side, duplicates merge, the skeptic 
   await ui.unmount()
 })
 
+test('a review the chat started without one of its reviewers is blocked, not passed', async ($, on) => {
+  const w = world(on)
+  w.outputs = { 'git status --porcelain': ' M src/run.ts\n', 'git diff HEAD': DIFF }
+  w.skip = ['deckhand:security-auditor']
+  const clock = mock.clock(on)
+  const ui = await toReview($, w, clock)
+
+  expect(w.spawned.map(s => s.subagentType)).toEqual(['deckhand:builder', 'deckhand:reviewer', 'deckhand:typescript-reviewer'])
+  // Both clean, and the chat turn ends: the step is blocked, not passed.
+  await ends($, w, clock, 2, 'NO FINDINGS')
+  await ends($, w, clock, 3, 'NO FINDINGS')
+  expect(await ui.find({ type: 'Text', text: /The chat didn't start security-auditor\. Retry\./ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'blocked' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a Review agent the chat started as another type still can\'t edit', async ($, on) => {
+  const w = world(on)
+  w.outputs = { 'git status --porcelain': ' M README.md\n', 'git diff HEAD': '+Some words\n' }
+  w.swap = { 'deckhand:reviewer': 'general-purpose' }
+  const clock = mock.clock(on)
+  await toReview($, w, clock)
+
+  expect(w.spawned[1]!.subagentType).toBe('general-purpose')
+  const denied = await $.tool.call({ tool: 'Edit', agentId: 'a2', file_path: 'src/a.ts', old_string: 'a', new_string: 'b' } as never)
+  expect(JSON.stringify(denied)).toContain('Blocked: reviewer')
+})
+
 test('Review sees each file inside a new folder, not just the folder', async ($, on) => {
   const w = world(on)
   w.outputs = {
@@ -178,6 +206,23 @@ test('a round with fewer findings runs the next round by itself; a clean second 
   await ui.press({ key: 'pipeline-approve' })
   await playChat($, w, clock)
   expect(w.spawned.at(-1)!.subagentType).toBe('deckhand:committer')
+  await ui.unmount()
+})
+
+test('a ticked finding the reviewers stay quiet on, but whose code is still there, comes back as not fixed', async ($, on) => {
+  const w = world(on, { 'README.md': 'call a() then b()\n' })
+  const clock = mock.clock(on)
+  const ui = await toGate($, w, clock, [med('a()'), med('b()')])
+  await ui.press({ key: 'pipeline-fix' })
+  await playChat($, w, clock)
+  // Build fixed a(); the reviewers report nothing, but b() is still in the file.
+  w.files.set('README.md', 'call fixed() then b()\n')
+  await round($, w, clock, [])
+
+  expect(await ui.find({ type: 'Text', text: /no progress/ })).toBeUndefined()
+  const report = [...w.files.entries()].find(([k]) => k.endsWith('02-review.md'))![1]
+  expect(report).toContain('About b() (still in the code)')
+  expect(report).not.toContain('About a()')
   await ui.unmount()
 })
 

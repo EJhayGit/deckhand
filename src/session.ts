@@ -3,6 +3,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
 import type { Agent, Chips, DeckAgent, Pipeline, Run } from '../types'
+import { READ_ONLY } from './agents/format'
+import type { Holder } from './limits'
 
 const deck = atom({ plugin: 'deckhand', key: 'deck' } as const, [] as DeckAgent[])
 const active = atom({ plugin: 'deckhand', key: 'active' } as const, null as string | null)
@@ -43,22 +45,27 @@ export async function current($: EngineInterface): Promise<{ card: DeckAgent; ch
 }
 
 // A subagent loop's own name and limits: a Pipeline step's agent (plain Claude
-// Code: all on), else the deck agent its Runs row names. Undefined: not one
-// of these, so the agent in use's limits hold.
-export async function loopAgent($: EngineInterface, agentId: string): Promise<{ name: string; limits: Chips['limits'] } | undefined> {
+// Code: all on; Review's never edit), else the deck agent its Runs row names.
+// Undefined: not one of these, so the agent in use's limits hold.
+export async function loopAgent($: EngineInterface, agentId: string): Promise<Holder | undefined> {
   const cards = await read($, deck)
   const run = (await read($, pipeline)).run
+  const row = (await read($, runs)).find(r => r.agentId === agentId)
   if (run && !run.ended && run.agentIds?.includes(agentId)) {
     const step = run.steps.find(s => s.status === 'running')
-    const name = run.phase === 'skeptic' ? 'skeptic' : step?.id === 'review' ? undefined : step?.agent
-    if (step && name === null) return { name: 'plain Claude Code', limits: ALL }
-    const card = name ? cards.find(c => c.agent.name === name) : undefined
-    if (card) return { name: card.agent.name, limits: card.agent.limits }
+    if (step?.id === 'review') {
+      // Reviewers and the skeptic change nothing, whatever type the chat started.
+      const type = run.agentTypes?.[agentId]
+      const card = cards.find(c => (type !== undefined && c.agentType === type) || c.agent.name === (run.phase === 'skeptic' ? 'skeptic' : row?.name))
+      return { name: card?.agent.name ?? 'reviewer', limits: { ...(card?.agent.limits ?? READ_ONLY), edit: false }, isOwners: true }
+    }
+    if (step && step.agent === null) return { name: 'plain Claude Code', limits: ALL, isOwners: true }
+    const card = step?.agent ? cards.find(c => c.agent.name === step.agent) : undefined
+    if (card) return { name: card.agent.name, limits: card.agent.limits, isOwners: true }
   }
-  const row = (await read($, runs)).find(r => r.agentId === agentId)
   const card = row ? cards.find(c => c.agent.name === row.name) : undefined
 
-  return card ? { name: card.agent.name, limits: card.agent.limits } : undefined
+  return card ? { name: card.agent.name, limits: card.agent.limits, ...(row?.byOwner ? { isOwners: true } : {}) } : undefined
 }
 
 // Built-in agents stay out of the model's agent list, so they cost no tokens,
